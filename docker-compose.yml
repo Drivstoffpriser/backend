@@ -1,0 +1,28 @@
+services:
+  db:
+    image: postgis/postgis:18-3.6
+    platform: linux/amd64
+    environment:
+      POSTGRES_USER: dummy_postgres_user
+      POSTGRES_PASSWORD: dummy_postgres_password
+      POSTGRES_DB: drivstoffpriser
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+
+  api:
+    build:
+      context: .
+      target: dev
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://dummy_postgres_user:dummy_postgres_password@db:5432/drivstoffpriser
+    volumes:
+      - .:/app
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:

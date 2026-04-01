@@ -1,0 +1,27 @@
+version: "3"
+
+env:
+  PYTHONPATH: .
+
+tasks:
+  database:initialize:
+    desc: Start postgres, apply schema migrations, and seed test data
+    cmds:
+      - task: database:start
+      - task: database:migrate
+
+  database:start:
+    desc: Start postgres and wait until it is ready to accept connections
+    cmds:
+      - docker compose up db -d
+      - until docker compose exec db pg_isready -U dummy_postgres_user -d drivstoffpriser; do sleep 1; done
+
+  database:migrate:
+    desc: Generate initial migration if none exists, reset schema, then apply all migrations
+    cmds:
+      - |
+        if [ -z "$(ls -A alembic/versions 2>/dev/null)" ]; then
+          uv run alembic revision --autogenerate -m "initial"
+        fi
+      - uv run python scripts/reset_db.py
+      - uv run alembic upgrade head
