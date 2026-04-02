@@ -3,6 +3,7 @@ import asyncio
 import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.pool import NullPool
 
 from app.core.config import get_settings
 from app.core.db import (
@@ -10,9 +11,6 @@ from app.core.db import (
     DBSession,
     get_db_session,
     import_all_models,
-)
-from app.core.db import (
-    db as database,
 )
 from app.main import app
 
@@ -35,7 +33,8 @@ def setup_database():
 
 @pytest.fixture
 async def db() -> DBSession:
-    async with database._engine.connect() as conn:
+    engine = create_async_engine(get_settings().database_url, poolclass=NullPool)
+    async with engine.connect() as conn:
         await conn.begin()
         async with AsyncSession(
             conn,
@@ -44,6 +43,7 @@ async def db() -> DBSession:
         ) as session:
             yield DBSession(session)
         await conn.rollback()
+    await engine.dispose()
 
 
 @pytest.fixture

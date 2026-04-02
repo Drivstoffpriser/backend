@@ -9,6 +9,12 @@ tasks:
     cmds:
       - task: database:start
       - task: database:migrate
+      - task: database:seed
+
+  database:seed:
+    desc: Seed the database with station data
+    cmds:
+      - uv run python scripts/seed.py
 
   database:start:
     desc: Start postgres and wait until it is ready to accept connections
