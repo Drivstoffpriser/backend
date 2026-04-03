@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.db import DBSession, get_db_session
+from app.stations.routers import stations_router
 
 app = FastAPI(title=get_settings().app_name, debug=get_settings().debug)
 
@@ -15,6 +16,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(stations_router)
 
 
 @app.get("/health", status_code=200)
