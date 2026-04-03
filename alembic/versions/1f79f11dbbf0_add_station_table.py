@@ -59,6 +59,7 @@ def upgrade() -> None:
                 from_text="ST_GeogFromText",
                 name="geography",
                 nullable=False,
+                spatial_index=False,
             ),
             nullable=False,
         ),
