@@ -1,8 +1,9 @@
+from typing import cast
 from uuid import uuid4
 
 import sqlalchemy as sa
 from geoalchemy2.shape import from_shape
-from shapely.geometry import Point
+from shapely.geometry import Point  # type: ignore[import-untyped]
 
 from app.core.db import DBSession
 from app.stations.enums import ProviderType
@@ -35,4 +36,4 @@ async def station_factory(
         )
         .returning(Station)
     )
-    return result.scalar_one()
+    return cast(Station, result.scalar_one())

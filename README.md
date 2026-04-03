@@ -30,6 +30,21 @@ uv run ruff check .
 uv run ruff format .
 ```
 
+## Spell checking
+
+We use CSpell for spell checking, which is enforced in CI. Install the
+[CSpell extension for VS Code](https://marketplace.visualstudio.com/items?itemName=streetsidesoftware.code-spell-checker)
+to get inline feedback as you type.
+
+To run it from the command line, install via npm:
+
+```bash
+npm install -g cspell
+cspell "**/*.{py,md}"
+```
+
+If CSpell flags a false positive, add the word to `project-words.txt`.
+
 ## Migrations
 
 ```bash

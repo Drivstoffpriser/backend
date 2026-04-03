@@ -72,7 +72,7 @@ EXCLUDE_TABLES = {
 def include_object(object, name, type_, reflected, compare_to):  # type: ignore[no-untyped-def]
     if type_ == "table" and name in EXCLUDE_TABLES:
         return False
-    return geo_include_object(object, name, type_, reflected, compare_to)
+    return geo_include_object(object, name, type_, reflected, compare_to)  # type: ignore[no-untyped-call]
 
 
 def run_migrations_offline() -> None:
