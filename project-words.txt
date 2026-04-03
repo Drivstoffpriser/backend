@@ -33,3 +33,5 @@ TANKEN
 Bogstadveien
 Grünerløkka
 Majorstuen
+OLJELEVERANDØREN
+TRONDER
