@@ -19,7 +19,7 @@ import_all_models()
 
 
 @pytest.fixture(scope="session", autouse=True)
-def setup_database() -> Generator[None, None, None]:
+def setup_database() -> Generator[None]:
     async def _run(coro: Callable[..., None]) -> None:
         engine = create_async_engine(get_settings().database_url)
         async with engine.begin() as conn:

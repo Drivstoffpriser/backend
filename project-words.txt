@@ -10,6 +10,7 @@ tabblock
 zcta
 
 # Python / tech
+ASGI
 autouse
 conftest
 coro
