@@ -4,7 +4,7 @@ from geoalchemy2 import WKBElement, WKTElement
 from geoalchemy2.shape import to_shape
 from pydantic import BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
-from shapely.geometry import Point
+from shapely.geometry import Point  # type: ignore[import-untyped]
 
 
 class CamelCaseModel(BaseModel):
