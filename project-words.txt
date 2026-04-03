@@ -1,0 +1,34 @@
+# PostGIS Tiger geocoder table names
+addrfeat
+countysub
+cousub
+featnames
+geocoder
+lookuptables
+pagc
+tabblock
+zcta
+
+# Python / tech
+autouse
+conftest
+coro
+drivstoffpriser
+geoalchemy
+isready
+modname
+poolclass
+postgis
+sessionmaker
+tankvenn
+
+# Fuel station brands
+DRIV
+ESSO
+HALTBAKK
+TANKEN
+
+# Norwegian places
+Bogstadveien
+Grünerløkka
+Majorstuen
