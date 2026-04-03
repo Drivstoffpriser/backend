@@ -11,6 +11,7 @@ class Station(Base):
     __tablename__ = "station"
     __table_args__ = (
         sa.UniqueConstraint("address", "city", name="uq_station_address_city"),
+        sa.Index("idx_station_location", "location", postgresql_using="gist"),
         sa.Index(
             "uq_station_location", sa.text("ST_AsText(location::geometry)"), unique=True
         ),
