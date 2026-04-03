@@ -24,5 +24,5 @@ class Station(Base):
     address: Mapped[str] = mapped_column(String)
     city: Mapped[str] = mapped_column(String)
     location: Mapped[WKBElement] = mapped_column(
-        Geography(geometry_type="POINT", srid=4326)
+        Geography(geometry_type="POINT", srid=4326, spatial_index=False)
     )
