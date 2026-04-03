@@ -33,3 +33,7 @@ TANKEN
 Bogstadveien
 Grünerløkka
 Majorstuen
+OLJELEVERANDØREN
+TRONDER
+Trønder
+levelname
