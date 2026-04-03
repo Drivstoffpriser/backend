@@ -1,8 +1,10 @@
+from decimal import Decimal
+
 from httpx import AsyncClient
 
 from app.core.db import DBSession
-from app.stations.enums import ProviderType
-from tests.stations.factories import station_factory
+from app.stations.enums import FuelType, ProviderType
+from tests.stations.factories import price_update_factory, station_factory
 
 BBOX_PARAMS = {
     "min_lat": 59.90,
@@ -74,3 +76,47 @@ async def test_get_stations_bbox_filters_by_bounds(
     stations = response.json()["stations"]
     assert len(stations) == 1
     assert stations[0]["osmId"] == "node/inside"
+
+
+async def test_get_stations_bbox_includes_prices(
+    client: AsyncClient, db: DBSession
+) -> None:
+    station = await station_factory(db, osm_id="node/1", lat=59.911, lng=10.752)
+    await price_update_factory(
+        db, station_id=station.id, fuel_type=FuelType.DIESEL, price=Decimal("20.00")
+    )
+    await price_update_factory(
+        db,
+        station_id=station.id,
+        fuel_type=FuelType.GASOLINE_95,
+        price=Decimal("22.90"),
+    )
+
+    response = await client.get("/stations/bbox", params=BBOX_PARAMS)
+
+    assert response.status_code == 200
+    stations = response.json()["stations"]
+    assert len(stations) == 1
+    prices = {p["fuelType"]: p for p in stations[0]["prices"]}
+    assert prices[FuelType.DIESEL]["price"] == "20.00"
+    assert prices[FuelType.GASOLINE_95]["price"] == "22.90"
+
+
+async def test_get_stations_bbox_only_returns_latest_prices(
+    client: AsyncClient, db: DBSession
+) -> None:
+    station = await station_factory(db, osm_id="node/1", lat=59.911, lng=10.752)
+    await price_update_factory(
+        db, station_id=station.id, fuel_type=FuelType.DIESEL, price=Decimal("19.00")
+    )
+    await price_update_factory(
+        db, station_id=station.id, fuel_type=FuelType.DIESEL, price=Decimal("20.50")
+    )
+
+    response = await client.get("/stations/bbox", params=BBOX_PARAMS)
+
+    assert response.status_code == 200
+    prices = response.json()["stations"][0]["prices"]
+    assert len(prices) == 1
+    assert prices[0]["fuelType"] == FuelType.DIESEL
+    assert prices[0]["price"] == "20.50"

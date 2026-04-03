@@ -1,16 +1,26 @@
+from collections import defaultdict
+from datetime import datetime
+from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
 
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, Query
 from geoalchemy2 import Geometry
+from pydantic import Field, field_validator
 
 from app.core.db import DBSession, get_db_session
 from app.core.schemas import CamelCaseModel, LocationSchema
-from app.stations.enums import ProviderType
-from app.stations.models import Station
+from app.stations.enums import FuelType, ProviderType
+from app.stations.models import PriceRegistration, Station
 
 stations_router = APIRouter(prefix="/stations", tags=["stations"])
+
+
+class PriceSchema(CamelCaseModel):
+    fuel_type: FuelType
+    price: Decimal
+    registered_at: datetime
 
 
 class StationSchema(CamelCaseModel):
@@ -21,13 +31,19 @@ class StationSchema(CamelCaseModel):
     address: str
     city: str
     location: LocationSchema
+    prices: list[PriceSchema] = []
 
 
 class GetStationsResponseBody(CamelCaseModel):
     stations: list[StationSchema]
 
     @classmethod
-    def from_models(cls, stations: list[Station]) -> GetStationsResponseBody:
+    def from_models(
+        cls,
+        stations: list[Station],
+        prices_by_station: dict[UUID, list[PriceRegistration]] | None = None,
+    ) -> GetStationsResponseBody:
+        prices_by_station = prices_by_station or {}
         return cls(
             stations=[
                 StationSchema(
@@ -38,10 +54,37 @@ class GetStationsResponseBody(CamelCaseModel):
                     address=station.address,
                     city=station.city,
                     location=LocationSchema.from_wkb(station.location),
+                    prices=[
+                        PriceSchema(
+                            fuel_type=p.fuel_type,
+                            price=p.price,
+                            registered_at=p.registered_at,
+                        )
+                        for p in prices_by_station.get(station.id, [])
+                    ],
                 )
                 for station in stations
             ]
         )
+
+
+async def _fetch_latest_prices(
+    db: DBSession, station_ids: list[UUID]
+) -> dict[UUID, list[PriceRegistration]]:
+    if not station_ids:
+        return {}
+
+    prices = await db.fetch_all(
+        sa.select(PriceRegistration).where(
+            PriceRegistration.station_id.in_(station_ids),
+            PriceRegistration.is_latest.is_(True),
+        )
+    )
+    result: dict[UUID, list[PriceRegistration]] = defaultdict(list)
+    for price in prices:
+        result[price.station_id].append(price)
+
+    return result
 
 
 @stations_router.get("/")
@@ -57,7 +100,8 @@ async def get_stations(
         .where(sa.func.ST_DWithin(Station.location, user_point, distance))
         .order_by(sa.func.ST_Distance(Station.location, user_point))
     )
-    return GetStationsResponseBody.from_models(stations)
+    prices_by_station = await _fetch_latest_prices(db, [s.id for s in stations])
+    return GetStationsResponseBody.from_models(stations, prices_by_station)
 
 
 @stations_router.get("/bbox")
@@ -74,4 +118,58 @@ async def get_stations_bbox(
             sa.func.ST_Within(sa.cast(Station.location, Geometry(srid=4326)), bbox)
         )
     )
-    return GetStationsResponseBody.from_models(stations)
+    prices_by_station = await _fetch_latest_prices(db, [s.id for s in stations])
+    return GetStationsResponseBody.from_models(stations, prices_by_station)
+
+
+PRICE_MIN = Decimal("10")
+PRICE_MAX = Decimal("40")
+
+
+class PriceRegistrationSchema(CamelCaseModel):
+    fuel_type: FuelType
+    price: Annotated[Decimal, Field(ge=PRICE_MIN, le=PRICE_MAX)]
+
+
+class RegisterPricesRequestBody(CamelCaseModel):
+    registrations: list[PriceRegistrationSchema]
+
+    @field_validator("registrations")
+    @classmethod
+    def validate_no_duplicate_fuel_types(
+        cls, v: list[PriceRegistrationSchema]
+    ) -> list[PriceRegistrationSchema]:
+        fuel_types = [r.fuel_type for r in v]
+        if len(fuel_types) != len(set(fuel_types)):
+            raise ValueError("Duplicate fuel types are not allowed")
+        return v
+
+
+@stations_router.post("/{station_id}/prices", status_code=201)
+async def register_prices(
+    station_id: UUID,
+    body: RegisterPricesRequestBody,
+    db: Annotated[DBSession, Depends(get_db_session)],
+    # TODO: Add auth
+) -> None:
+    fuel_types = [r.fuel_type for r in body.registrations]
+    await db.execute(
+        sa.update(PriceRegistration)
+        .where(
+            PriceRegistration.station_id == station_id,
+            PriceRegistration.fuel_type.in_(fuel_types),
+            PriceRegistration.is_latest.is_(True),
+        )
+        .values({PriceRegistration.is_latest: False})
+    )
+    for registration in body.registrations:
+        await db.execute(
+            sa.insert(PriceRegistration).values(
+                {
+                    PriceRegistration.station_id: station_id,
+                    PriceRegistration.fuel_type: registration.fuel_type,
+                    PriceRegistration.price: registration.price,
+                    PriceRegistration.is_latest: True,
+                }
+            )
+        )

@@ -16,3 +16,13 @@ class ProviderType(StrEnum):
     UNO_X = "UNO_X"
     YX = "YX"
     YX_TRUCK = "YX_TRUCK"
+
+
+class FuelType(StrEnum):
+    DIESEL = "DIESEL"
+    GASOLINE_95 = "GASOLINE_95"
+    GASOLINE_98 = "GASOLINE_98"
+
+
+class PriceRegistrationSourceType(StrEnum):
+    USER = "USER"
