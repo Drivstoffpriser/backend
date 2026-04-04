@@ -34,7 +34,7 @@ async def add_favorite_station(
     await db.execute(
         pg_insert(FavoriteStation)
         .values(user_id=current_user.id, station_id=station_id)
-        .on_conflict_do_nothing()
+        .on_conflict_do_nothing(constraint="uq_favorite_station_user_station")
     )
 
 
