@@ -9,10 +9,12 @@ from fastapi import APIRouter, Depends, Query
 from geoalchemy2 import Geometry
 from pydantic import Field, field_validator
 
+from app.core.auth import get_current_user, get_verified_user
 from app.core.db import DBSession, get_db_session
 from app.core.schemas import CamelCaseModel, LocationSchema
 from app.stations.enums import FuelType, ProviderType
 from app.stations.models import PriceRegistration, Station
+from app.users.models import User
 
 stations_router = APIRouter(prefix="/stations", tags=["stations"])
 
@@ -90,6 +92,7 @@ async def _fetch_latest_prices(
 @stations_router.get("/")
 async def get_stations(
     db: Annotated[DBSession, Depends(get_db_session)],
+    _: Annotated[User, Depends(get_current_user)],
     lat: Annotated[float, Query()],
     lng: Annotated[float, Query()],
     distance: Annotated[float, Query(gt=0, description="Max distance in meters")],
@@ -107,6 +110,7 @@ async def get_stations(
 @stations_router.get("/bbox")
 async def get_stations_bbox(
     db: Annotated[DBSession, Depends(get_db_session)],
+    _: Annotated[User, Depends(get_current_user)],
     min_lat: Annotated[float, Query()],
     min_lng: Annotated[float, Query()],
     max_lat: Annotated[float, Query()],
@@ -150,7 +154,7 @@ async def register_prices(
     station_id: UUID,
     body: RegisterPricesRequestBody,
     db: Annotated[DBSession, Depends(get_db_session)],
-    # TODO: Add auth
+    verified_user: Annotated[User, Depends(get_verified_user)],
 ) -> None:
     fuel_types = [r.fuel_type for r in body.registrations]
     await db.execute(
@@ -169,6 +173,7 @@ async def register_prices(
                     PriceRegistration.station_id: station_id,
                     PriceRegistration.fuel_type: registration.fuel_type,
                     PriceRegistration.price: registration.price,
+                    PriceRegistration.registered_by: verified_user.id,
                     PriceRegistration.is_latest: True,
                 }
             )

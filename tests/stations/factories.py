@@ -11,6 +11,7 @@ from shapely.geometry import Point  # type: ignore[import-untyped]
 from app.core.db import DBSession
 from app.stations.enums import FuelType, ProviderType
 from app.stations.models import PriceRegistration, Station
+from tests.users.factories import verified_user_factory
 
 
 async def station_factory(
@@ -51,11 +52,19 @@ async def price_update_factory(
     db: DBSession,
     *,
     station_id: UUID,
+    registered_by: UUID | EllipsisType = ...,
     fuel_type: FuelType = FuelType.DIESEL,
     price: Decimal = Decimal("20.00"),
     registered_at: datetime | EllipsisType = ...,
 ) -> PriceRegistration:
 
+    if registered_by is ...:
+        firebase_uid = str(uuid4())
+        registered_by = (
+            await verified_user_factory(
+                db=db, firebase_uid=firebase_uid, email=f"{firebase_uid}@example.com"
+            )
+        ).id
     if registered_at is ...:
         registered_at = datetime.now(UTC)
 
@@ -74,6 +83,7 @@ async def price_update_factory(
         .values(
             {
                 PriceRegistration.station_id: station_id,
+                PriceRegistration.registered_by: registered_by,
                 PriceRegistration.fuel_type: fuel_type,
                 PriceRegistration.price: price,
                 PriceRegistration.registered_at: registered_at,
