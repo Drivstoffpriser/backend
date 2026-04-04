@@ -41,7 +41,7 @@ uv run pre-commit run --all-files
 
 ## Spell checking
 
-We use CSpell for spell checking, which is enforced in CI. Install the
+You can use CSpell for spell checking. It is not enforced in CI, but encouraged. Install the
 [CSpell extension for VS Code](https://marketplace.visualstudio.com/items?itemName=streetsidesoftware.code-spell-checker)
 to get inline feedback as you type.
 
