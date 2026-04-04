@@ -63,6 +63,9 @@ async def test_add_favorite(
 
     assert response.status_code == 201
 
+    favorites = await client.get("/users/me/favorites", authenticate_with=verified_user)
+    assert favorites.json() == [str(station.id)]
+
 
 async def test_add_favorite_is_idempotent(
     client: AuthenticatedClient, db: DBSession, verified_user: User
@@ -95,6 +98,9 @@ async def test_remove_favorite(
     )
 
     assert response.status_code == 204
+
+    favorites = await client.get("/users/me/favorites", authenticate_with=verified_user)
+    assert favorites.json() == []
 
 
 async def test_remove_favorite_not_favorited_returns_404(
