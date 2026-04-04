@@ -13,3 +13,13 @@ repos:
       - id: ruff
       - id: ruff-format
         args: [--check]
+
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        language: system
+        entry: uv run mypy
+        types: [python]
+        pass_filenames: false
+        args: [.]
