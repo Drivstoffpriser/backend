@@ -1,10 +1,14 @@
+from datetime import datetime
+from decimal import Decimal
+from uuid import UUID
+
 import sqlalchemy as sa
 from geoalchemy2 import Geography, WKBElement
-from sqlalchemy import String
+from sqlalchemy import DateTime, ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base
-from app.stations.enums import ProviderType
+from app.stations.enums import FuelType, PriceRegistrationSourceType, ProviderType
 
 
 class Station(Base):
@@ -27,3 +31,31 @@ class Station(Base):
     location: Mapped[WKBElement] = mapped_column(
         Geography(geometry_type="POINT", srid=4326, spatial_index=False)
     )
+
+
+class PriceRegistration(Base):
+    __tablename__ = "price_registration"
+    __table_args__ = (
+        sa.Index(
+            "uq_price_registration_latest_per_station_fuel",
+            "station_id",
+            "fuel_type",
+            unique=True,
+            postgresql_where=sa.text("is_latest = true"),
+        ),
+    )
+
+    station_id: Mapped[UUID] = mapped_column(ForeignKey("station.id"))
+    registered_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=sa.func.now()
+    )
+    fuel_type: Mapped[FuelType] = mapped_column(
+        sa.Enum(FuelType, length=50, native_enum=False)
+    )
+    price: Mapped[Decimal] = mapped_column(Numeric(precision=10, scale=2))
+    source_type: Mapped[PriceRegistrationSourceType] = mapped_column(
+        sa.Enum(PriceRegistrationSourceType, length=50, native_enum=False),
+        server_default=PriceRegistrationSourceType.USER,
+    )
+    is_latest: Mapped[bool] = mapped_column(sa.Boolean, server_default=sa.text("true"))
+    # TODO: Add registered_by

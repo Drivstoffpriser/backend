@@ -32,8 +32,9 @@ TANKEN
 # Norwegian places
 Bogstadveien
 Grünerløkka
+levelname
 Majorstuen
 OLJELEVERANDØREN
 TRONDER
 Trønder
-levelname
+unsets
