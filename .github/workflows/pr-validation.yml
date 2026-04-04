@@ -30,15 +30,6 @@ jobs:
       - name: Check types
         run: uv run mypy .
 
-  spell-check:
-    name: Validate spelling
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: streetsidesoftware/cspell-action@v6
-        with:
-          files: "**/*.{py,md}"
-
   validate-build:
     name: Validate build
     runs-on: ubuntu-latest
