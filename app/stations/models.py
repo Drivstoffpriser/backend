@@ -57,5 +57,5 @@ class PriceRegistration(Base):
         sa.Enum(PriceRegistrationSourceType, length=50, native_enum=False),
         server_default=PriceRegistrationSourceType.USER,
     )
+    registered_by: Mapped[UUID] = mapped_column(ForeignKey("user.id"))
     is_latest: Mapped[bool] = mapped_column(sa.Boolean, server_default=sa.text("true"))
-    # TODO: Add registered_by

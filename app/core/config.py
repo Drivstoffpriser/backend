@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     # CORS
     allowed_origins: list[str] = []
 
+    # Firebase
+    firebase_service_account_b64: str = ""
+
     # Database
     db_user: str
     db_password: str
