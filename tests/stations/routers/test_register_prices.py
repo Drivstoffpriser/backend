@@ -1,16 +1,18 @@
 from decimal import Decimal
 
 import sqlalchemy as sa
-from httpx import AsyncClient
 
 from app.core.db import DBSession
 from app.stations.enums import FuelType
 from app.stations.models import PriceRegistration
+from app.users.models import User
+from tests.conftest import AuthenticatedClient
 from tests.stations.factories import price_update_factory, station_factory
+from tests.users.factories import user_factory
 
 
 async def test_register_prices_creates_records(
-    client: AsyncClient, db: DBSession
+    client: AuthenticatedClient, db: DBSession, verified_user: User
 ) -> None:
     station = await station_factory(db, osm_id="node/1")
 
@@ -22,6 +24,7 @@ async def test_register_prices_creates_records(
                 {"fuelType": FuelType.GASOLINE_95, "price": "22.90"},
             ]
         },
+        authenticate_with=verified_user,
     )
 
     assert response.status_code == 201
@@ -38,7 +41,7 @@ async def test_register_prices_creates_records(
 
 
 async def test_register_prices_only_unsets_same_fuel_type(
-    client: AsyncClient, db: DBSession
+    client: AuthenticatedClient, db: DBSession, verified_user: User
 ) -> None:
     station = await station_factory(db, osm_id="node/1")
     old_diesel = await price_update_factory(
@@ -54,6 +57,7 @@ async def test_register_prices_only_unsets_same_fuel_type(
     response = await client.post(
         f"/stations/{station.id}/prices",
         json={"registrations": [{"fuelType": FuelType.DIESEL, "price": "21.50"}]},
+        authenticate_with=verified_user,
     )
 
     assert response.status_code == 201
@@ -79,13 +83,14 @@ async def test_register_prices_only_unsets_same_fuel_type(
 
 
 async def test_register_prices_rejects_price_below_min(
-    client: AsyncClient, db: DBSession
+    client: AuthenticatedClient, db: DBSession, verified_user: User
 ) -> None:
     station = await station_factory(db, osm_id="node/1")
 
     response = await client.post(
         f"/stations/{station.id}/prices",
         json={"registrations": [{"fuelType": FuelType.DIESEL, "price": "9.99"}]},
+        authenticate_with=verified_user,
     )
 
     assert response.status_code == 422
@@ -95,13 +100,14 @@ async def test_register_prices_rejects_price_below_min(
 
 
 async def test_register_prices_rejects_price_above_max(
-    client: AsyncClient, db: DBSession
+    client: AuthenticatedClient, db: DBSession, verified_user: User
 ) -> None:
     station = await station_factory(db, osm_id="node/1")
 
     response = await client.post(
         f"/stations/{station.id}/prices",
         json={"registrations": [{"fuelType": FuelType.DIESEL, "price": "40.01"}]},
+        authenticate_with=verified_user,
     )
 
     assert response.status_code == 422
@@ -111,7 +117,7 @@ async def test_register_prices_rejects_price_above_max(
 
 
 async def test_register_prices_rejects_duplicate_fuel_types(
-    client: AsyncClient, db: DBSession
+    client: AuthenticatedClient, db: DBSession, verified_user: User
 ) -> None:
     station = await station_factory(db, osm_id="node/1")
 
@@ -123,6 +129,7 @@ async def test_register_prices_rejects_duplicate_fuel_types(
                 {"fuelType": FuelType.DIESEL, "price": "21.00"},
             ]
         },
+        authenticate_with=verified_user,
     )
 
     assert response.status_code == 422
@@ -132,7 +139,7 @@ async def test_register_prices_rejects_duplicate_fuel_types(
 
 
 async def test_register_prices_does_not_affect_other_stations(
-    client: AsyncClient, db: DBSession
+    client: AuthenticatedClient, db: DBSession, verified_user: User
 ) -> None:
     s1 = await station_factory(db, osm_id="node/1")
     s2 = await station_factory(db, osm_id="node/2", lat=59.920, lng=10.760)
@@ -143,9 +150,49 @@ async def test_register_prices_does_not_affect_other_stations(
     await client.post(
         f"/stations/{s1.id}/prices",
         json={"registrations": [{"fuelType": FuelType.DIESEL, "price": "21.50"}]},
+        authenticate_with=verified_user,
     )
 
     row = await db.fetch_one(
         sa.select(PriceRegistration).where(PriceRegistration.id == other.id)
     )
     assert row.is_latest is True
+
+
+async def test_register_prices_rejects_unverified_user(
+    client: AuthenticatedClient, db: DBSession
+) -> None:
+    station = await station_factory(db, osm_id="node/1")
+    unverified_user = await user_factory(
+        db=db, firebase_uid="unverified-uid", email="unverified@example.com"
+    )
+
+    response = await client.post(
+        f"/stations/{station.id}/prices",
+        json={"registrations": [{"fuelType": FuelType.DIESEL, "price": "20.00"}]},
+        authenticate_with=unverified_user,
+    )
+
+    assert response.status_code == 403
+
+
+async def test_register_prices_sets_registered_by_to_authenticated_user(
+    client: AuthenticatedClient, db: DBSession, verified_user: User
+) -> None:
+    station = await station_factory(db, osm_id="node/1")
+
+    response = await client.post(
+        f"/stations/{station.id}/prices",
+        json={"registrations": [{"fuelType": FuelType.DIESEL, "price": "20.00"}]},
+        authenticate_with=verified_user,
+    )
+
+    assert response.status_code == 201
+
+    row = await db.fetch_one(
+        sa.select(PriceRegistration).where(
+            PriceRegistration.station_id == station.id,
+            PriceRegistration.is_latest.is_(True),
+        )
+    )
+    assert row.registered_by == verified_user.id

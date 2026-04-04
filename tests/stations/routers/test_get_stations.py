@@ -1,10 +1,10 @@
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from httpx import AsyncClient
-
 from app.core.db import DBSession
 from app.stations.enums import FuelType, ProviderType
+from app.users.models import User
+from tests.conftest import AuthenticatedClient
 from tests.stations.factories import price_update_factory, station_factory
 
 # User location: central Oslo
@@ -13,7 +13,7 @@ USER_LNG = 10.752
 
 
 async def test_get_stations_returns_stations(
-    client: AsyncClient, db: DBSession
+    client: AuthenticatedClient, db: DBSession, unverified_user: User
 ) -> None:
     s1 = await station_factory(
         db,
@@ -35,7 +35,9 @@ async def test_get_stations_returns_stations(
     )
 
     response = await client.get(
-        "/stations/", params={"lat": USER_LAT, "lng": USER_LNG, "distance": 10_000}
+        "/stations/",
+        params={"lat": USER_LAT, "lng": USER_LNG, "distance": 10_000},
+        authenticate_with=unverified_user,
     )
 
     assert response.status_code == 200
@@ -54,9 +56,13 @@ async def test_get_stations_returns_stations(
     assert station["prices"] == []
 
 
-async def test_get_stations_empty(client: AsyncClient) -> None:
+async def test_get_stations_empty(
+    client: AuthenticatedClient, unverified_user: User
+) -> None:
     response = await client.get(
-        "/stations/", params={"lat": USER_LAT, "lng": USER_LNG, "distance": 10_000}
+        "/stations/",
+        params={"lat": USER_LAT, "lng": USER_LNG, "distance": 10_000},
+        authenticate_with=unverified_user,
     )
 
     assert response.status_code == 200
@@ -64,7 +70,7 @@ async def test_get_stations_empty(client: AsyncClient) -> None:
 
 
 async def test_get_stations_filters_by_distance(
-    client: AsyncClient, db: DBSession
+    client: AuthenticatedClient, db: DBSession, unverified_user: User
 ) -> None:
     await station_factory(
         db,
@@ -84,7 +90,9 @@ async def test_get_stations_filters_by_distance(
     )
 
     response = await client.get(
-        "/stations/", params={"lat": USER_LAT, "lng": USER_LNG, "distance": 5_000}
+        "/stations/",
+        params={"lat": USER_LAT, "lng": USER_LNG, "distance": 5_000},
+        authenticate_with=unverified_user,
     )
 
     assert response.status_code == 200
@@ -94,7 +102,7 @@ async def test_get_stations_filters_by_distance(
 
 
 async def test_get_stations_ordered_by_distance(
-    client: AsyncClient, db: DBSession
+    client: AuthenticatedClient, db: DBSession, unverified_user: User
 ) -> None:
     # ~1.1 km north of user
     await station_factory(
@@ -116,7 +124,9 @@ async def test_get_stations_ordered_by_distance(
     )
 
     response = await client.get(
-        "/stations/", params={"lat": USER_LAT, "lng": USER_LNG, "distance": 10_000}
+        "/stations/",
+        params={"lat": USER_LAT, "lng": USER_LNG, "distance": 10_000},
+        authenticate_with=unverified_user,
     )
 
     stations = response.json()["stations"]
@@ -126,7 +136,7 @@ async def test_get_stations_ordered_by_distance(
 
 
 async def test_get_stations_includes_latest_prices(
-    client: AsyncClient, db: DBSession
+    client: AuthenticatedClient, db: DBSession, unverified_user: User
 ) -> None:
     station = await station_factory(db, osm_id="node/1")
 
@@ -157,7 +167,9 @@ async def test_get_stations_includes_latest_prices(
     )
 
     response = await client.get(
-        "/stations/", params={"lat": USER_LAT, "lng": USER_LNG, "distance": 10_000}
+        "/stations/",
+        params={"lat": USER_LAT, "lng": USER_LNG, "distance": 10_000},
+        authenticate_with=unverified_user,
     )
 
     assert response.status_code == 200
@@ -172,7 +184,7 @@ async def test_get_stations_includes_latest_prices(
 
 
 async def test_get_stations_only_includes_prices_for_own_station(
-    client: AsyncClient, db: DBSession
+    client: AuthenticatedClient, db: DBSession, unverified_user: User
 ) -> None:
     s1 = await station_factory(db, osm_id="node/1", lat=59.911, lng=10.752)
     s2 = await station_factory(db, osm_id="node/2", lat=59.912, lng=10.752)
@@ -185,7 +197,9 @@ async def test_get_stations_only_includes_prices_for_own_station(
     )
 
     response = await client.get(
-        "/stations/", params={"lat": USER_LAT, "lng": USER_LNG, "distance": 10_000}
+        "/stations/",
+        params={"lat": USER_LAT, "lng": USER_LNG, "distance": 10_000},
+        authenticate_with=unverified_user,
     )
 
     assert response.status_code == 200
