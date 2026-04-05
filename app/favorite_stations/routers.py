@@ -10,7 +10,7 @@ from app.core.db import DBSession, get_db_session
 from app.favorite_stations.models import FavoriteStation
 from app.users.models import User
 
-favorite_stations_router = APIRouter(prefix="/users/me/favorites", tags=["favorites"])
+favorite_stations_router = APIRouter(prefix="/favorites", tags=["favorites"])
 
 
 @favorite_stations_router.get("")

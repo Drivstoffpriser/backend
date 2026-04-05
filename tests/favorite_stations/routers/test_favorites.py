@@ -9,7 +9,7 @@ from tests.users.factories import verified_user_factory
 async def test_get_favorites_empty(
     client: AuthenticatedClient, verified_user: User
 ) -> None:
-    response = await client.get("/users/me/favorites", authenticate_with=verified_user)
+    response = await client.get("/favorites", authenticate_with=verified_user)
 
     assert response.status_code == 200
     assert response.json() == []
@@ -26,7 +26,7 @@ async def test_get_favorites_returns_station_ids(
     await favorite_station_factory(db, user_id=verified_user.id, station_id=s1.id)
     await favorite_station_factory(db, user_id=verified_user.id, station_id=s2.id)
 
-    response = await client.get("/users/me/favorites", authenticate_with=verified_user)
+    response = await client.get("/favorites", authenticate_with=verified_user)
 
     assert response.status_code == 200
     assert set(response.json()) == {str(s1.id), str(s2.id)}
@@ -44,7 +44,7 @@ async def test_get_favorites_does_not_return_other_users_favorites(
 
     await favorite_station_factory(db, user_id=other_user.id, station_id=station.id)
 
-    response = await client.get("/users/me/favorites", authenticate_with=verified_user)
+    response = await client.get("/favorites", authenticate_with=verified_user)
 
     assert response.status_code == 200
     assert response.json() == []
@@ -58,12 +58,12 @@ async def test_add_favorite(
     )
 
     response = await client.post(
-        f"/users/me/favorites/{station.id}", authenticate_with=verified_user
+        f"/favorites/{station.id}", authenticate_with=verified_user
     )
 
     assert response.status_code == 201
 
-    favorites = await client.get("/users/me/favorites", authenticate_with=verified_user)
+    favorites = await client.get("/favorites", authenticate_with=verified_user)
     assert favorites.json() == [str(station.id)]
 
 
@@ -75,16 +75,14 @@ async def test_add_favorite_is_idempotent(
     )
 
     # Add the same station twice
-    await client.post(
-        f"/users/me/favorites/{station.id}", authenticate_with=verified_user
-    )
+    await client.post(f"/favorites/{station.id}", authenticate_with=verified_user)
     response = await client.post(
-        f"/users/me/favorites/{station.id}", authenticate_with=verified_user
+        f"/favorites/{station.id}", authenticate_with=verified_user
     )
 
     assert response.status_code == 201
 
-    favorites = await client.get("/users/me/favorites", authenticate_with=verified_user)
+    favorites = await client.get("/favorites", authenticate_with=verified_user)
     assert favorites.json() == [str(station.id)]
 
 
@@ -97,12 +95,12 @@ async def test_remove_favorite(
     await favorite_station_factory(db, user_id=verified_user.id, station_id=station.id)
 
     response = await client.delete(
-        f"/users/me/favorites/{station.id}", authenticate_with=verified_user
+        f"/favorites/{station.id}", authenticate_with=verified_user
     )
 
     assert response.status_code == 204
 
-    favorites = await client.get("/users/me/favorites", authenticate_with=verified_user)
+    favorites = await client.get("/favorites", authenticate_with=verified_user)
     assert favorites.json() == []
 
 
@@ -114,7 +112,7 @@ async def test_remove_favorite_not_favorited_returns_404(
     )
 
     response = await client.delete(
-        f"/users/me/favorites/{station.id}", authenticate_with=verified_user
+        f"/favorites/{station.id}", authenticate_with=verified_user
     )
 
     assert response.status_code == 404
