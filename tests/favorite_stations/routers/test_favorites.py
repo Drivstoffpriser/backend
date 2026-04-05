@@ -58,7 +58,9 @@ async def test_add_favorite(
     )
 
     response = await client.post(
-        f"/favorites/{station.id}", authenticate_with=verified_user
+        "/favorites",
+        json={"station_id": str(station.id)},
+        authenticate_with=verified_user,
     )
 
     assert response.status_code == 201
@@ -75,9 +77,15 @@ async def test_add_favorite_is_idempotent(
     )
 
     # Add the same station twice
-    await client.post(f"/favorites/{station.id}", authenticate_with=verified_user)
+    await client.post(
+        "/favorites",
+        json={"station_id": str(station.id)},
+        authenticate_with=verified_user,
+    )
     response = await client.post(
-        f"/favorites/{station.id}", authenticate_with=verified_user
+        "/favorites",
+        json={"station_id": str(station.id)},
+        authenticate_with=verified_user,
     )
 
     assert response.status_code == 201
@@ -95,7 +103,9 @@ async def test_remove_favorite(
     await favorite_station_factory(db, user_id=verified_user.id, station_id=station.id)
 
     response = await client.delete(
-        f"/favorites/{station.id}", authenticate_with=verified_user
+        "/favorites",
+        json={"station_id": str(station.id)},
+        authenticate_with=verified_user,
     )
 
     assert response.status_code == 204
@@ -112,7 +122,9 @@ async def test_remove_favorite_not_favorited_returns_404(
     )
 
     response = await client.delete(
-        f"/favorites/{station.id}", authenticate_with=verified_user
+        "/favorites",
+        json={"station_id": str(station.id)},
+        authenticate_with=verified_user,
     )
 
     assert response.status_code == 404
