@@ -39,3 +39,4 @@ async def test_remove_favorite_not_favorited_returns_404(
     )
 
     assert response.status_code == 404
+    assert response.json()["detail"] == "Favorite not found"
