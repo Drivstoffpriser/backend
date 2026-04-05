@@ -5,7 +5,7 @@ from tests.stations.factories import station_factory
 
 
 async def test_add_favorite(
-    client: AuthenticatedClient, db: DBSession, verified_user: User
+    client: AuthenticatedClient, db: DBSession, unverified_user: User
 ) -> None:
     station = await station_factory(
         db, osm_id="node/1", name="Station 1", address="Addr 1"
@@ -14,17 +14,17 @@ async def test_add_favorite(
     response = await client.post(
         "/favorites",
         json={"station_id": str(station.id)},
-        authenticate_with=verified_user,
+        authenticate_with=unverified_user,
     )
 
     assert response.status_code == 201
 
-    favorites = await client.get("/favorites", authenticate_with=verified_user)
+    favorites = await client.get("/favorites", authenticate_with=unverified_user)
     assert favorites.json() == [str(station.id)]
 
 
 async def test_add_favorite_is_idempotent(
-    client: AuthenticatedClient, db: DBSession, verified_user: User
+    client: AuthenticatedClient, db: DBSession, unverified_user: User
 ) -> None:
     station = await station_factory(
         db, osm_id="node/1", name="Station 1", address="Addr 1"
@@ -34,15 +34,15 @@ async def test_add_favorite_is_idempotent(
     await client.post(
         "/favorites",
         json={"station_id": str(station.id)},
-        authenticate_with=verified_user,
+        authenticate_with=unverified_user,
     )
     response = await client.post(
         "/favorites",
         json={"station_id": str(station.id)},
-        authenticate_with=verified_user,
+        authenticate_with=unverified_user,
     )
 
     assert response.status_code == 201
 
-    favorites = await client.get("/favorites", authenticate_with=verified_user)
+    favorites = await client.get("/favorites", authenticate_with=unverified_user)
     assert favorites.json() == [str(station.id)]

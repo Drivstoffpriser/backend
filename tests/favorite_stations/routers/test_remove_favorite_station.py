@@ -6,27 +6,29 @@ from tests.stations.factories import station_factory
 
 
 async def test_remove_favorite(
-    client: AuthenticatedClient, db: DBSession, verified_user: User
+    client: AuthenticatedClient, db: DBSession, unverified_user: User
 ) -> None:
     station = await station_factory(
         db, osm_id="node/1", name="Station 1", address="Addr 1"
     )
-    await favorite_station_factory(db, user_id=verified_user.id, station_id=station.id)
+    await favorite_station_factory(
+        db, user_id=unverified_user.id, station_id=station.id
+    )
 
     response = await client.delete(
         "/favorites",
         json={"station_id": str(station.id)},
-        authenticate_with=verified_user,
+        authenticate_with=unverified_user,
     )
 
     assert response.status_code == 204
 
-    favorites = await client.get("/favorites", authenticate_with=verified_user)
+    favorites = await client.get("/favorites", authenticate_with=unverified_user)
     assert favorites.json() == []
 
 
 async def test_remove_favorite_not_favorited_returns_404(
-    client: AuthenticatedClient, db: DBSession, verified_user: User
+    client: AuthenticatedClient, db: DBSession, unverified_user: User
 ) -> None:
     station = await station_factory(
         db, osm_id="node/1", name="Station 1", address="Addr 1"
@@ -35,7 +37,7 @@ async def test_remove_favorite_not_favorited_returns_404(
     response = await client.delete(
         "/favorites",
         json={"station_id": str(station.id)},
-        authenticate_with=verified_user,
+        authenticate_with=unverified_user,
     )
 
     assert response.status_code == 404
