@@ -15,6 +15,9 @@ async def test_remove_favorite(
         db, user_id=unverified_user.id, station_id=station.id
     )
 
+    favorites = await client.get("/favorites", authenticate_with=unverified_user)
+    assert favorites.json() == [str(station.id)]
+
     response = await client.delete(
         "/favorites",
         json={"station_id": str(station.id)},
