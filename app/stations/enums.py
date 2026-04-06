@@ -26,3 +26,22 @@ class FuelType(StrEnum):
 
 class PriceRegistrationSourceType(StrEnum):
     USER = "USER"
+
+
+BRAND_TO_PROVIDER: dict[str, ProviderType] = {
+    "Automat1": ProviderType.AUTOMAT_1,
+    "Automat 1": ProviderType.AUTOMAT_1,
+    "Best": ProviderType.BEST,
+    "Bunker Oil": ProviderType.BUNKER_OIL,
+    "Circle K": ProviderType.CIRCLE_K,
+    "Driv": ProviderType.DRIV,
+    "Esso": ProviderType.ESSO,
+    "Haltbakk Express": ProviderType.HALTBAKK_EXPRESS,
+    "Oljeleverandøren": ProviderType.OLJELEVERANDØREN,
+    "St1": ProviderType.ST1,
+    "Tanken": ProviderType.TANKEN,
+    "Trønder Oil": ProviderType.TRONDER_OIL,
+    "Uno-X": ProviderType.UNO_X,
+    "YX": ProviderType.YX,
+    "YX Truck": ProviderType.YX_TRUCK,
+}

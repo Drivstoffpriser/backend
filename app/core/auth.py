@@ -21,7 +21,7 @@ _bearer = HTTPBearer()
 
 
 @lru_cache(maxsize=1)
-def _get_firebase_app() -> firebase_admin.App:
+def get_firebase_app() -> firebase_admin.App:
     settings = get_settings()
     if settings.firebase_service_account_b64:
         cred = firebase_admin.credentials.Certificate(
@@ -40,7 +40,7 @@ async def get_current_user(
         decoded = await asyncio.to_thread(
             firebase_admin.auth.verify_id_token,
             credentials.credentials,
-            app=_get_firebase_app(),
+            app=get_firebase_app(),
         )
     except firebase_admin.auth.ExpiredIdTokenError as e:
         raise HTTPException(

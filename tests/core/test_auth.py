@@ -3,9 +3,11 @@ from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import MagicMock, patch
 
+import firebase_admin.auth  # type: ignore[import-untyped]
 import pytest
 from fastapi.security import HTTPAuthorizationCredentials
 
+import app.core.auth
 from app.core.auth import get_current_user
 from app.core.db import DBSession
 from tests.users.factories import user_factory
@@ -16,15 +18,16 @@ def _make_credentials() -> HTTPAuthorizationCredentials:
 
 
 def _patch_firebase(decoded: dict[str, Any]) -> Any:
-    return patch(
-        "app.core.auth.firebase_admin.auth.verify_id_token",
+    return patch.object(
+        firebase_admin.auth,
+        "verify_id_token",
         return_value=decoded,
     )
 
 
 @pytest.fixture(autouse=True)
 def patch_firebase_app() -> Generator[None]:
-    with patch("app.core.auth._get_firebase_app", return_value=MagicMock()):
+    with patch.object(app.core.auth, "get_firebase_app", return_value=MagicMock()):
         yield
 
 
