@@ -50,7 +50,7 @@ async def seed() -> None:
                     insert(Station)
                     .values(
                         {
-                            Station.osm_id: s["id"],
+                            Station.external_id: s["id"],
                             Station.name: s["name"],
                             Station.provider: BRAND_TO_PROVIDER[s["brand"]],
                             Station.address: s["address"] or "",

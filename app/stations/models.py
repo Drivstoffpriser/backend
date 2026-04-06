@@ -21,7 +21,7 @@ class Station(Base):
         ),
     )
 
-    osm_id: Mapped[str] = mapped_column(String, unique=True)
+    external_id: Mapped[str] = mapped_column(String, unique=True)
     name: Mapped[str] = mapped_column(String, unique=True)
     provider: Mapped[ProviderType] = mapped_column(
         sa.Enum(ProviderType, length=50, native_enum=False)

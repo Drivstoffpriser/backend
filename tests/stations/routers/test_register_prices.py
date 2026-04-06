@@ -14,7 +14,7 @@ from tests.users.factories import user_factory
 async def test_register_prices_creates_records(
     client: AuthenticatedClient, db: DBSession, verified_user: User
 ) -> None:
-    station = await station_factory(db, osm_id="node/1")
+    station = await station_factory(db, external_id="node/1")
 
     response = await client.post(
         f"/stations/{station.id}/prices",
@@ -43,7 +43,7 @@ async def test_register_prices_creates_records(
 async def test_register_prices_only_unsets_same_fuel_type(
     client: AuthenticatedClient, db: DBSession, verified_user: User
 ) -> None:
-    station = await station_factory(db, osm_id="node/1")
+    station = await station_factory(db, external_id="node/1")
     old_diesel = await price_update_factory(
         db, station_id=station.id, fuel_type=FuelType.DIESEL, price=Decimal("20.00")
     )
@@ -85,7 +85,7 @@ async def test_register_prices_only_unsets_same_fuel_type(
 async def test_register_prices_rejects_price_below_min(
     client: AuthenticatedClient, db: DBSession, verified_user: User
 ) -> None:
-    station = await station_factory(db, osm_id="node/1")
+    station = await station_factory(db, external_id="node/1")
 
     response = await client.post(
         f"/stations/{station.id}/prices",
@@ -102,7 +102,7 @@ async def test_register_prices_rejects_price_below_min(
 async def test_register_prices_rejects_price_above_max(
     client: AuthenticatedClient, db: DBSession, verified_user: User
 ) -> None:
-    station = await station_factory(db, osm_id="node/1")
+    station = await station_factory(db, external_id="node/1")
 
     response = await client.post(
         f"/stations/{station.id}/prices",
@@ -119,7 +119,7 @@ async def test_register_prices_rejects_price_above_max(
 async def test_register_prices_rejects_duplicate_fuel_types(
     client: AuthenticatedClient, db: DBSession, verified_user: User
 ) -> None:
-    station = await station_factory(db, osm_id="node/1")
+    station = await station_factory(db, external_id="node/1")
 
     response = await client.post(
         f"/stations/{station.id}/prices",
@@ -141,8 +141,8 @@ async def test_register_prices_rejects_duplicate_fuel_types(
 async def test_register_prices_does_not_affect_other_stations(
     client: AuthenticatedClient, db: DBSession, verified_user: User
 ) -> None:
-    s1 = await station_factory(db, osm_id="node/1")
-    s2 = await station_factory(db, osm_id="node/2", lat=59.920, lng=10.760)
+    s1 = await station_factory(db, external_id="node/1")
+    s2 = await station_factory(db, external_id="node/2", lat=59.920, lng=10.760)
     other = await price_update_factory(
         db, station_id=s2.id, fuel_type=FuelType.DIESEL, price=Decimal("20.00")
     )
@@ -162,7 +162,7 @@ async def test_register_prices_does_not_affect_other_stations(
 async def test_register_prices_rejects_unverified_user(
     client: AuthenticatedClient, db: DBSession
 ) -> None:
-    station = await station_factory(db, osm_id="node/1")
+    station = await station_factory(db, external_id="node/1")
     unverified_user = await user_factory(
         db=db, firebase_uid="unverified-uid", email="unverified@example.com"
     )
@@ -179,7 +179,7 @@ async def test_register_prices_rejects_unverified_user(
 async def test_register_prices_sets_registered_by_to_authenticated_user(
     client: AuthenticatedClient, db: DBSession, verified_user: User
 ) -> None:
-    station = await station_factory(db, osm_id="node/1")
+    station = await station_factory(db, external_id="node/1")
 
     response = await client.post(
         f"/stations/{station.id}/prices",

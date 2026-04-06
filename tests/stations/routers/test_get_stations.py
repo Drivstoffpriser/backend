@@ -17,7 +17,7 @@ async def test_get_stations_returns_stations(
 ) -> None:
     s1 = await station_factory(
         db,
-        osm_id="node/1",
+        external_id="node/1",
         name="Shell Majorstuen",
         provider=ProviderType.ST1,
         address="Bogstadveien 1",
@@ -27,7 +27,7 @@ async def test_get_stations_returns_stations(
     )
     await station_factory(
         db,
-        osm_id="node/2",
+        external_id="node/2",
         name="Circle K Grünerløkka",
         address="Grünerløkka 1",
         lat=59.920,
@@ -44,10 +44,10 @@ async def test_get_stations_returns_stations(
     stations = response.json()["stations"]
     assert len(stations) == 2
 
-    by_osm_id = {s["osmId"]: s for s in stations}
-    station = by_osm_id["node/1"]
+    by_external_id = {s["externalId"]: s for s in stations}
+    station = by_external_id["node/1"]
     assert station["id"] == str(s1.id)
-    assert station["osmId"] == "node/1"
+    assert station["externalId"] == "node/1"
     assert station["name"] == "Shell Majorstuen"
     assert station["provider"] == "ST1"
     assert station["address"] == "Bogstadveien 1"
@@ -74,7 +74,7 @@ async def test_get_stations_filters_by_distance(
 ) -> None:
     await station_factory(
         db,
-        osm_id="node/near",
+        external_id="node/near",
         name="Nearby Station",
         address="Near St 1",
         lat=59.911,
@@ -82,7 +82,7 @@ async def test_get_stations_filters_by_distance(
     )
     await station_factory(
         db,
-        osm_id="node/far",
+        external_id="node/far",
         name="Faraway Station",
         address="Far St 1",
         lat=61.0,  # ~120 km north
@@ -98,7 +98,7 @@ async def test_get_stations_filters_by_distance(
     assert response.status_code == 200
     stations = response.json()["stations"]
     assert len(stations) == 1
-    assert stations[0]["osmId"] == "node/near"
+    assert stations[0]["externalId"] == "node/near"
 
 
 async def test_get_stations_ordered_by_distance(
@@ -107,7 +107,7 @@ async def test_get_stations_ordered_by_distance(
     # ~1.1 km north of user
     await station_factory(
         db,
-        osm_id="node/far",
+        external_id="node/far",
         name="Far Station",
         address="Far St 1",
         lat=59.921,
@@ -116,7 +116,7 @@ async def test_get_stations_ordered_by_distance(
     # ~100 m north of user
     await station_factory(
         db,
-        osm_id="node/near",
+        external_id="node/near",
         name="Near Station",
         address="Near St 1",
         lat=59.912,
@@ -131,14 +131,14 @@ async def test_get_stations_ordered_by_distance(
 
     stations = response.json()["stations"]
     assert len(stations) == 2
-    assert stations[0]["osmId"] == "node/near"
-    assert stations[1]["osmId"] == "node/far"
+    assert stations[0]["externalId"] == "node/near"
+    assert stations[1]["externalId"] == "node/far"
 
 
 async def test_get_stations_includes_latest_prices(
     client: AuthenticatedClient, db: DBSession, unverified_user: User
 ) -> None:
-    station = await station_factory(db, osm_id="node/1")
+    station = await station_factory(db, external_id="node/1")
 
     t1 = datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
     t2 = datetime(2026, 1, 2, 12, 0, tzinfo=UTC)
@@ -186,8 +186,8 @@ async def test_get_stations_includes_latest_prices(
 async def test_get_stations_only_includes_prices_for_own_station(
     client: AuthenticatedClient, db: DBSession, unverified_user: User
 ) -> None:
-    s1 = await station_factory(db, osm_id="node/1", lat=59.911, lng=10.752)
-    s2 = await station_factory(db, osm_id="node/2", lat=59.912, lng=10.752)
+    s1 = await station_factory(db, external_id="node/1", lat=59.911, lng=10.752)
+    s2 = await station_factory(db, external_id="node/2", lat=59.912, lng=10.752)
 
     await price_update_factory(
         db, station_id=s1.id, fuel_type=FuelType.DIESEL, price=Decimal("20.00")
@@ -203,7 +203,7 @@ async def test_get_stations_only_includes_prices_for_own_station(
     )
 
     assert response.status_code == 200
-    by_osm_id = {s["osmId"]: s for s in response.json()["stations"]}
+    by_external_id = {s["externalId"]: s for s in response.json()["stations"]}
 
-    assert by_osm_id["node/1"]["prices"][0]["price"] == "20.00"
-    assert by_osm_id["node/2"]["prices"][0]["price"] == "25.00"
+    assert by_external_id["node/1"]["prices"][0]["price"] == "20.00"
+    assert by_external_id["node/2"]["prices"][0]["price"] == "25.00"
