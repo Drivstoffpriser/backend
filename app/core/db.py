@@ -49,6 +49,9 @@ class DBSession:
     async def execute(self, statement: Executable) -> Any:
         return await self._session.execute(statement)
 
+    async def commit(self) -> None:
+        await self._session.commit()
+
 
 class Database:
     def __init__(self) -> None:
