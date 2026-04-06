@@ -5,6 +5,7 @@ description = "Drivstoffpriser backend API"
 requires-python = ">=3.14"
 dependencies = [
     "alembic>=1.18.4",
+    "apscheduler>=3.11,<4",
     "asyncpg>=0.31.0",
     "fastapi[standard]>=0.135.2",
     "firebase-admin>=6.0.0",
