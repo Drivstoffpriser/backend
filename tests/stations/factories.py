@@ -17,7 +17,7 @@ from tests.users.factories import verified_user_factory
 async def station_factory(
     db: DBSession,
     *,
-    osm_id: str = "node/123456",
+    external_id: str = "node/123456",
     name: str | EllipsisType = ...,
     provider: ProviderType = ProviderType.CIRCLE_K,
     address: str | EllipsisType = ...,
@@ -26,16 +26,16 @@ async def station_factory(
     lng: float = 10.752,
 ) -> Station:
     if name is ...:
-        name = f"Station {osm_id}"
+        name = f"Station {external_id}"
     if address is ...:
-        address = f"Street {osm_id}"
+        address = f"Street {external_id}"
 
     result = await db.execute(
         sa.insert(Station)
         .values(
             {
                 Station.id: uuid4(),
-                Station.osm_id: osm_id,
+                Station.external_id: external_id,
                 Station.name: name,
                 Station.provider: provider,
                 Station.address: address,

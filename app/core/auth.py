@@ -68,6 +68,7 @@ async def get_current_user(
     )
     user: User | None = result.scalars().one_or_none()
     if user is not None:
+        await db.commit()
         return user
 
     existing: User = await db.fetch_one(sa.select(User).where(User.firebase_uid == uid))
@@ -78,6 +79,7 @@ async def get_current_user(
             .values({User.verified_at: sa.func.now()})
             .returning(User)
         )
+        await db.commit()
         return cast(User, result.scalars().one())
     return existing
 

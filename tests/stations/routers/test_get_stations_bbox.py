@@ -19,7 +19,7 @@ async def test_get_stations_bbox_returns_stations(
 ) -> None:
     s1 = await station_factory(
         db,
-        osm_id="node/1",
+        external_id="node/1",
         name="Shell Majorstuen",
         provider=ProviderType.ST1,
         address="Bogstadveien 1",
@@ -37,7 +37,7 @@ async def test_get_stations_bbox_returns_stations(
     assert len(stations) == 1
     station = stations[0]
     assert station["id"] == str(s1.id)
-    assert station["osmId"] == "node/1"
+    assert station["externalId"] == "node/1"
     assert station["name"] == "Shell Majorstuen"
     assert station["provider"] == "ST1"
     assert station["address"] == "Bogstadveien 1"
@@ -61,7 +61,7 @@ async def test_get_stations_bbox_filters_by_bounds(
 ) -> None:
     await station_factory(
         db,
-        osm_id="node/inside",
+        external_id="node/inside",
         name="Inside Station",
         address="Inside St 1",
         lat=59.911,
@@ -69,7 +69,7 @@ async def test_get_stations_bbox_filters_by_bounds(
     )
     await station_factory(
         db,
-        osm_id="node/outside",
+        external_id="node/outside",
         name="Outside Station",
         address="Outside St 1",
         lat=61.0,  # well north of bbox
@@ -83,13 +83,13 @@ async def test_get_stations_bbox_filters_by_bounds(
     assert response.status_code == 200
     stations = response.json()["stations"]
     assert len(stations) == 1
-    assert stations[0]["osmId"] == "node/inside"
+    assert stations[0]["externalId"] == "node/inside"
 
 
 async def test_get_stations_bbox_includes_prices(
     client: AuthenticatedClient, db: DBSession, unverified_user: User
 ) -> None:
-    station = await station_factory(db, osm_id="node/1", lat=59.911, lng=10.752)
+    station = await station_factory(db, external_id="node/1", lat=59.911, lng=10.752)
     await price_update_factory(
         db, station_id=station.id, fuel_type=FuelType.DIESEL, price=Decimal("20.00")
     )
@@ -115,7 +115,7 @@ async def test_get_stations_bbox_includes_prices(
 async def test_get_stations_bbox_only_returns_latest_prices(
     client: AuthenticatedClient, db: DBSession, unverified_user: User
 ) -> None:
-    station = await station_factory(db, osm_id="node/1", lat=59.911, lng=10.752)
+    station = await station_factory(db, external_id="node/1", lat=59.911, lng=10.752)
     await price_update_factory(
         db, station_id=station.id, fuel_type=FuelType.DIESEL, price=Decimal("19.00")
     )
