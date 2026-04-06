@@ -51,6 +51,7 @@ async def add_favorite_station(
         )
         .on_conflict_do_nothing(constraint="uq_favorite_station_user_station")
     )
+    await db.commit()
 
 
 @favorite_stations_router.delete("", status_code=204)
@@ -69,3 +70,4 @@ async def remove_favorite_station(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Favorite not found"
         )
+    await db.commit()

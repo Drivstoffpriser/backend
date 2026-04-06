@@ -11,7 +11,7 @@ async def test_add_favorite(
     client: AuthenticatedClient, db: DBSession, unverified_user: User
 ) -> None:
     station = await station_factory(
-        db, osm_id="node/1", name="Station 1", address="Addr 1"
+        db, external_id="node/1", name="Station 1", address="Addr 1"
     )
 
     response = await client.post(
@@ -30,7 +30,7 @@ async def test_add_favorite_is_idempotent(
     client: AuthenticatedClient, db: DBSession, unverified_user: User
 ) -> None:
     station = await station_factory(
-        db, osm_id="node/1", name="Station 1", address="Addr 1"
+        db, external_id="node/1", name="Station 1", address="Addr 1"
     )
 
     # Add the same station twice

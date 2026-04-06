@@ -9,7 +9,7 @@ async def test_remove_favorite(
     client: AuthenticatedClient, db: DBSession, unverified_user: User
 ) -> None:
     station = await station_factory(
-        db, osm_id="node/1", name="Station 1", address="Addr 1"
+        db, external_id="node/1", name="Station 1", address="Addr 1"
     )
     await favorite_station_factory(
         db, user_id=unverified_user.id, station_id=station.id
@@ -34,7 +34,7 @@ async def test_remove_favorite_not_favorited_returns_404(
     client: AuthenticatedClient, db: DBSession, unverified_user: User
 ) -> None:
     station = await station_factory(
-        db, osm_id="node/1", name="Station 1", address="Addr 1"
+        db, external_id="node/1", name="Station 1", address="Addr 1"
     )
 
     response = await client.delete(

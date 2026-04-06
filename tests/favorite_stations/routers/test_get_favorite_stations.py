@@ -18,9 +18,16 @@ async def test_get_favorites_empty(
 async def test_get_favorites_returns_station_ids(
     client: AuthenticatedClient, db: DBSession, unverified_user: User
 ) -> None:
-    s1 = await station_factory(db, osm_id="node/1", name="Station 1", address="Addr 1")
+    s1 = await station_factory(
+        db, external_id="node/1", name="Station 1", address="Addr 1"
+    )
     s2 = await station_factory(
-        db, osm_id="node/2", name="Station 2", address="Addr 2", lat=59.920, lng=10.760
+        db,
+        external_id="node/2",
+        name="Station 2",
+        address="Addr 2",
+        lat=59.920,
+        lng=10.760,
     )
 
     await favorite_station_factory(db, user_id=unverified_user.id, station_id=s1.id)
@@ -39,7 +46,7 @@ async def test_get_favorites_does_not_return_other_users_favorites(
         db=db, firebase_uid="other", email="other@example.com"
     )
     station = await station_factory(
-        db, osm_id="node/1", name="Station 1", address="Addr 1"
+        db, external_id="node/1", name="Station 1", address="Addr 1"
     )
 
     await favorite_station_factory(db, user_id=other_user.id, station_id=station.id)
