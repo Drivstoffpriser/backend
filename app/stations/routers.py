@@ -178,3 +178,4 @@ async def register_prices(
                 }
             )
         )
+    await db.commit()
