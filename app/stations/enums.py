@@ -26,7 +26,14 @@ class FuelType(StrEnum):
 
 class PriceRegistrationSourceType(StrEnum):
     USER = "USER"
+    FIRESTORE = "FIRESTORE"
 
+
+FIRESTORE_FUEL_TYPE_MAP: dict[str, FuelType] = {
+    "diesel": FuelType.DIESEL,
+    "petrol95": FuelType.GASOLINE_95,
+    "petrol98": FuelType.GASOLINE_98,
+}
 
 BRAND_TO_PROVIDER: dict[str, ProviderType] = {
     "Automat1": ProviderType.AUTOMAT_1,

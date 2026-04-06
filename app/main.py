@@ -7,6 +7,9 @@ from apscheduler.schedulers.asyncio import (  # type: ignore[import-untyped]
     AsyncIOScheduler,
 )
 from apscheduler.triggers.cron import CronTrigger  # type: ignore[import-untyped]
+from apscheduler.triggers.interval import (  # type: ignore[import-untyped]
+    IntervalTrigger,
+)
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -14,7 +17,7 @@ from app.core.config import get_settings
 from app.core.db import DBSession, get_db_session
 from app.favorite_stations.routers import favorite_stations_router
 from app.stations.routers import stations_router
-from app.stations.sync import sync_stations_from_firestore
+from app.stations.sync import sync_prices_from_firestore, sync_stations_from_firestore
 from app.users.routers import users_router
 
 
@@ -25,6 +28,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         sync_stations_from_firestore,
         CronTrigger(hour=3, minute=0, timezone="Europe/Oslo"),
         id="sync_stations",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        sync_prices_from_firestore,
+        IntervalTrigger(minutes=10),
+        id="sync_prices",
         replace_existing=True,
     )
     scheduler.start()
