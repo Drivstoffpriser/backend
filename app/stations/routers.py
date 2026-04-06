@@ -1,4 +1,3 @@
-from collections import defaultdict
 from datetime import datetime
 from decimal import Decimal
 from typing import Annotated
@@ -12,6 +11,7 @@ from pydantic import Field, field_validator
 from app.core.auth import get_current_user, get_verified_user
 from app.core.db import DBSession, get_db_session
 from app.core.schemas import CamelCaseModel, LocationSchema
+from app.stations import services as stations_services
 from app.stations.enums import FuelType, ProviderType
 from app.stations.models import PriceRegistration, Station
 from app.users.models import User
@@ -43,9 +43,8 @@ class GetStationsResponseBody(CamelCaseModel):
     def from_models(
         cls,
         stations: list[Station],
-        prices_by_station: dict[UUID, list[PriceRegistration]] | None = None,
+        prices_by_station: dict[UUID, list[PriceRegistration]],
     ) -> GetStationsResponseBody:
-        prices_by_station = prices_by_station or {}
         return cls(
             stations=[
                 StationSchema(
@@ -70,25 +69,6 @@ class GetStationsResponseBody(CamelCaseModel):
         )
 
 
-async def _fetch_latest_prices(
-    db: DBSession, station_ids: list[UUID]
-) -> dict[UUID, list[PriceRegistration]]:
-    if not station_ids:
-        return {}
-
-    prices = await db.fetch_all(
-        sa.select(PriceRegistration).where(
-            PriceRegistration.station_id.in_(station_ids),
-            PriceRegistration.is_latest.is_(True),
-        )
-    )
-    result: dict[UUID, list[PriceRegistration]] = defaultdict(list)
-    for price in prices:
-        result[price.station_id].append(price)
-
-    return result
-
-
 @stations_router.get("/")
 async def get_stations(
     db: Annotated[DBSession, Depends(get_db_session)],
@@ -103,7 +83,8 @@ async def get_stations(
         .where(sa.func.ST_DWithin(Station.location, user_point, distance))
         .order_by(sa.func.ST_Distance(Station.location, user_point))
     )
-    prices_by_station = await _fetch_latest_prices(db, [s.id for s in stations])
+    station_ids = [s.id for s in stations]
+    prices_by_station = await stations_services.fetch_latest_prices(db, station_ids)
     return GetStationsResponseBody.from_models(stations, prices_by_station)
 
 
@@ -122,7 +103,8 @@ async def get_stations_bbox(
             sa.func.ST_Within(sa.cast(Station.location, Geometry(srid=4326)), bbox)
         )
     )
-    prices_by_station = await _fetch_latest_prices(db, [s.id for s in stations])
+    station_ids = [s.id for s in stations]
+    prices_by_station = await stations_services.fetch_latest_prices(db, station_ids)
     return GetStationsResponseBody.from_models(stations, prices_by_station)
 
 

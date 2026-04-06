@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.db import DBSession, get_db_session
+from app.external.routers import external_router
 from app.stations.routers import stations_router
 from app.users.routers import users_router
 
@@ -18,6 +19,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(external_router)
 app.include_router(stations_router)
 app.include_router(users_router)
 
