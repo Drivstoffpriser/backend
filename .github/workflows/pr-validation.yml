@@ -67,6 +67,24 @@ jobs:
           enable-cache: true
           python-version: "3.14"
 
+      - name: Run migrations
+        env:
+          DB_USER: ci
+          DB_PASSWORD: ci
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: drivstoffpriser
+        run: uv run alembic upgrade head
+
+      - name: Check no migrations would be created
+        env:
+          DB_USER: ci
+          DB_PASSWORD: ci
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: drivstoffpriser
+        run: uv run alembic check
+
       - name: Run tests
         env:
           DB_USER: ci
