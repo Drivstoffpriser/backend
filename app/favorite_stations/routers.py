@@ -3,18 +3,18 @@ from uuid import UUID
 
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.core.auth import get_current_user
 from app.core.db import DBSession, get_db_session
+from app.core.schemas import CamelCaseModel
 from app.favorite_stations.models import FavoriteStation
 from app.users.models import User
 
 favorite_stations_router = APIRouter(prefix="/favorites", tags=["favorites"])
 
 
-class PostAddFavoriteStationRequestBody(BaseModel):
+class FavoriteStationRequest(CamelCaseModel):
     station_id: UUID
 
 
@@ -32,7 +32,7 @@ async def get_favorite_stations(
 
 @favorite_stations_router.post("", status_code=201)
 async def add_favorite_station(
-    body: PostAddFavoriteStationRequestBody,
+    body: FavoriteStationRequest,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[DBSession, Depends(get_db_session)],
 ) -> None:
@@ -50,7 +50,7 @@ async def add_favorite_station(
 
 @favorite_stations_router.delete("", status_code=204)
 async def remove_favorite_station(
-    body: PostAddFavoriteStationRequestBody,
+    body: FavoriteStationRequest,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[DBSession, Depends(get_db_session)],
 ) -> None:
