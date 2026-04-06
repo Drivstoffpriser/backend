@@ -18,7 +18,11 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql+asyncpg://dummy_postgres_user:dummy_postgres_password@db:5432/drivstoffpriser
+      - DB_USER=dummy_postgres_user
+      - DB_PASSWORD=dummy_postgres_password
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=drivstoffpriser
     volumes:
       - .:/app
     depends_on:
