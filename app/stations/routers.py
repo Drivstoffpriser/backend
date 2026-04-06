@@ -27,7 +27,7 @@ class PriceSchema(CamelCaseModel):
 
 class StationSchema(CamelCaseModel):
     id: UUID
-    osm_id: str
+    external_id: str
     name: str
     provider: ProviderType
     address: str
@@ -50,7 +50,7 @@ class GetStationsResponseBody(CamelCaseModel):
             stations=[
                 StationSchema(
                     id=station.id,
-                    osm_id=station.osm_id,
+                    external_id=station.external_id,
                     name=station.name,
                     provider=station.provider,
                     address=station.address,
