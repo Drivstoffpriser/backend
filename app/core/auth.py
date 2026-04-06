@@ -2,12 +2,13 @@ import asyncio
 import base64
 import json
 from functools import lru_cache
-from typing import Annotated, cast
+from typing import Annotated, Any, cast
 
 import firebase_admin  # type: ignore[import-untyped]
 import firebase_admin.auth  # type: ignore[import-untyped]
 import firebase_admin.credentials  # type: ignore[import-untyped]
 import sqlalchemy as sa
+import sqlalchemy.orm
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -53,16 +54,19 @@ async def get_current_user(
     uid: str = decoded["uid"]
     email: str | None = decoded.get("email")
     display_name: str | None = decoded.get("name")
+    email_verified: bool = decoded.get("email_verified", False)
+
+    insert_values: dict[sqlalchemy.orm.InstrumentedAttribute[Any], Any] = {
+        User.firebase_uid: uid,
+        User.email: email,
+        User.display_name: display_name,
+    }
+    if email_verified:
+        insert_values[User.verified_at] = sa.func.now()
 
     result = await db.execute(
         pg_insert(User)
-        .values(
-            {
-                User.firebase_uid: uid,
-                User.email: email,
-                User.display_name: display_name,
-            }
-        )
+        .values(insert_values)
         .on_conflict_do_nothing(index_elements=[User.firebase_uid])
         .returning(User)
     )
@@ -72,7 +76,7 @@ async def get_current_user(
         return user
 
     existing: User = await db.fetch_one(sa.select(User).where(User.firebase_uid == uid))
-    if existing.verified_at is None and email is not None:
+    if existing.verified_at is None and email_verified:
         result = await db.execute(
             sa.update(User)
             .where(User.firebase_uid == uid)
@@ -82,6 +86,17 @@ async def get_current_user(
         await db.commit()
         return cast(User, result.scalars().one())
     return existing
+
+
+async def get_logged_in_user(
+    user: Annotated[User, Depends(get_current_user)],
+) -> User:
+    if user.email is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Email required",
+        )
+    return user
 
 
 async def get_verified_user(

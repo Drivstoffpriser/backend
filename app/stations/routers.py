@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Query
 from geoalchemy2 import Geometry
 from pydantic import Field, field_validator
 
-from app.core.auth import get_current_user, get_verified_user
+from app.core.auth import get_current_user, get_logged_in_user
 from app.core.db import DBSession, get_db_session
 from app.core.schemas import CamelCaseModel, LocationSchema
 from app.stations.enums import FuelType, ProviderType
@@ -154,7 +154,7 @@ async def register_prices(
     station_id: UUID,
     body: RegisterPricesRequestBody,
     db: Annotated[DBSession, Depends(get_db_session)],
-    verified_user: Annotated[User, Depends(get_verified_user)],
+    logged_in_user: Annotated[User, Depends(get_logged_in_user)],
 ) -> None:
     fuel_types = [r.fuel_type for r in body.registrations]
     await db.execute(
@@ -173,7 +173,7 @@ async def register_prices(
                     PriceRegistration.station_id: station_id,
                     PriceRegistration.fuel_type: registration.fuel_type,
                     PriceRegistration.price: registration.price,
-                    PriceRegistration.registered_by: verified_user.id,
+                    PriceRegistration.registered_by: logged_in_user.id,
                     PriceRegistration.is_latest: True,
                 }
             )

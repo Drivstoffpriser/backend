@@ -28,8 +28,13 @@ def patch_firebase_app() -> Generator[None]:
         yield
 
 
-async def test_new_user_is_created(db: DBSession) -> None:
-    decoded = {"uid": "new-uid", "email": "new@example.com", "name": "New User"}
+async def test_new_verified_user_is_created(db: DBSession) -> None:
+    decoded = {
+        "uid": "new-uid",
+        "email": "new@example.com",
+        "name": "New User",
+        "email_verified": True,
+    }
 
     with _patch_firebase(decoded):
         user = await get_current_user(db=db, credentials=_make_credentials())
@@ -37,6 +42,22 @@ async def test_new_user_is_created(db: DBSession) -> None:
     assert user.firebase_uid == "new-uid"
     assert user.email == "new@example.com"
     assert user.display_name == "New User"
+    assert user.verified_at is not None
+
+
+async def test_new_unverified_user_is_created(db: DBSession) -> None:
+    decoded = {
+        "uid": "new-uid",
+        "email": "new@example.com",
+        "email_verified": False,
+    }
+
+    with _patch_firebase(decoded):
+        user = await get_current_user(db=db, credentials=_make_credentials())
+
+    assert user.firebase_uid == "new-uid"
+    assert user.email == "new@example.com"
+    assert user.verified_at is None
 
 
 async def test_existing_user_is_returned(db: DBSession) -> None:
@@ -45,6 +66,7 @@ async def test_existing_user_is_returned(db: DBSession) -> None:
         "uid": "existing-uid",
         "email": existing.email,
         "name": existing.display_name,
+        "email_verified": True,
     }
 
     with _patch_firebase(decoded):
@@ -61,7 +83,11 @@ async def test_verified_at_set_when_existing_user_has_email_and_no_verified_at(
     )
     assert existing.verified_at is None
 
-    decoded = {"uid": "uid-unverified", "email": "v@example.com"}
+    decoded = {
+        "uid": "uid-unverified",
+        "email": "v@example.com",
+        "email_verified": True,
+    }
 
     with _patch_firebase(decoded):
         user = await get_current_user(db=db, credentials=_make_credentials())
@@ -78,7 +104,11 @@ async def test_verified_at_not_overwritten_when_already_set(db: DBSession) -> No
         verified_at=original_ts,
     )
 
-    decoded = {"uid": "uid-already-verified", "email": "already@example.com"}
+    decoded = {
+        "uid": "uid-already-verified",
+        "email": "already@example.com",
+        "email_verified": True,
+    }
 
     with _patch_firebase(decoded):
         user = await get_current_user(db=db, credentials=_make_credentials())
@@ -86,15 +116,33 @@ async def test_verified_at_not_overwritten_when_already_set(db: DBSession) -> No
     assert user.verified_at == original_ts
 
 
-async def test_verified_at_not_set_when_token_has_no_email(db: DBSession) -> None:
+async def test_verified_at_not_set_when_email_not_verified(db: DBSession) -> None:
     existing = await user_factory(
-        db=db, firebase_uid="uid-no-email", email=None, verified_at=None
+        db=db,
+        firebase_uid="uid-unverified-email",
+        email="unv@example.com",
+        verified_at=None,
     )
 
-    decoded = {"uid": "uid-no-email"}
+    decoded = {
+        "uid": "uid-unverified-email",
+        "email": "unv@example.com",
+        "email_verified": False,
+    }
 
     with _patch_firebase(decoded):
         user = await get_current_user(db=db, credentials=_make_credentials())
 
     assert user.id == existing.id
+    assert user.verified_at is None
+
+
+async def test_anonymous_user_has_no_verified_at(db: DBSession) -> None:
+    decoded = {"uid": "anon-uid", "provider_id": "anonymous"}
+
+    with _patch_firebase(decoded):
+        user = await get_current_user(db=db, credentials=_make_credentials())
+
+    assert user.firebase_uid == "anon-uid"
+    assert user.email is None
     assert user.verified_at is None
