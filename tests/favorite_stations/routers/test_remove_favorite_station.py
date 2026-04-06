@@ -16,7 +16,7 @@ async def test_remove_favorite(
     )
 
     favorites = await client.get("/favorites", authenticate_with=unverified_user)
-    assert favorites.json() == [str(station.id)]
+    assert favorites.json() == {"stationIds": [str(station.id)]}
 
     response = await client.delete(
         "/favorites",
@@ -27,7 +27,7 @@ async def test_remove_favorite(
     assert response.status_code == 204
 
     favorites = await client.get("/favorites", authenticate_with=unverified_user)
-    assert favorites.json() == []
+    assert favorites.json() == {"stationIds": []}
 
 
 async def test_remove_favorite_not_favorited_returns_404(

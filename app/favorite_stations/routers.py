@@ -18,16 +18,21 @@ class FavoriteStationRequest(CamelCaseModel):
     station_id: UUID
 
 
+class GetFavoriteStationsResponseBody(CamelCaseModel):
+    station_ids: list[UUID]
+
+
 @favorite_stations_router.get("")
 async def get_favorite_stations(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[DBSession, Depends(get_db_session)],
-) -> list[UUID]:
-    return await db.fetch_all(
+) -> GetFavoriteStationsResponseBody:
+    station_ids = await db.fetch_all(
         sa.select(FavoriteStation.station_id).where(
             FavoriteStation.user_id == current_user.id
         )
     )
+    return GetFavoriteStationsResponseBody(station_ids=station_ids)
 
 
 @favorite_stations_router.post("", status_code=201)

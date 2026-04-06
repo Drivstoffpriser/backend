@@ -23,7 +23,7 @@ async def test_add_favorite(
     assert response.status_code == 201
 
     favorites = await client.get("/favorites", authenticate_with=unverified_user)
-    assert favorites.json() == [str(station.id)]
+    assert favorites.json() == {"stationIds": [str(station.id)]}
 
 
 async def test_add_favorite_is_idempotent(
@@ -55,4 +55,4 @@ async def test_add_favorite_is_idempotent(
     assert rows == [station.id]
 
     favorites = await client.get("/favorites", authenticate_with=unverified_user)
-    assert favorites.json() == [str(station.id)]
+    assert favorites.json() == {"stationIds": [str(station.id)]}

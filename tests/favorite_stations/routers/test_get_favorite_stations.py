@@ -12,7 +12,7 @@ async def test_get_favorites_empty(
     response = await client.get("/favorites", authenticate_with=unverified_user)
 
     assert response.status_code == 200
-    assert response.json() == []
+    assert response.json() == {"stationIds": []}
 
 
 async def test_get_favorites_returns_station_ids(
@@ -29,7 +29,7 @@ async def test_get_favorites_returns_station_ids(
     response = await client.get("/favorites", authenticate_with=unverified_user)
 
     assert response.status_code == 200
-    assert set(response.json()) == {str(s1.id), str(s2.id)}
+    assert set(response.json()["stationIds"]) == {str(s1.id), str(s2.id)}
 
 
 async def test_get_favorites_does_not_return_other_users_favorites(
@@ -47,4 +47,4 @@ async def test_get_favorites_does_not_return_other_users_favorites(
     response = await client.get("/favorites", authenticate_with=unverified_user)
 
     assert response.status_code == 200
-    assert response.json() == []
+    assert response.json() == {"stationIds": []}
