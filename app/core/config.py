@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     # Firebase
     firebase_service_account_b64: str = ""
 
+    # Anthropic
+    anthropic_api_key: str = ""
+
     # Database
     db_user: str
     db_password: str
