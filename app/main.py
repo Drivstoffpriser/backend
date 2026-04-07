@@ -18,6 +18,7 @@ from app.core.db import DBSession, get_db_session
 from app.favorite_stations.routers import favorite_stations_router
 from app.stations.routers import stations_router
 from app.stations.sync import sync_prices_from_firestore, sync_stations_from_firestore
+from app.tools.routers import tools_router
 from app.users.routers import users_router
 
 
@@ -57,6 +58,7 @@ app.add_middleware(
 app.include_router(favorite_stations_router)
 app.include_router(stations_router)
 app.include_router(users_router)
+app.include_router(tools_router)
 
 
 @app.get("/health", status_code=200)

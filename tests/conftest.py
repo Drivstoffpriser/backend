@@ -113,17 +113,17 @@ async def client(db: DBSession) -> AsyncGenerator[AuthenticatedClient]:
 
 
 @pytest.fixture
-async def verified_user(db: DBSession) -> User:
-    return await verified_user_factory(db=db)
+async def guest_user(db: DBSession) -> User:
+    return await user_factory(db=db, email=None)
 
 
 @pytest.fixture
-async def logged_in_user(db: DBSession) -> User:
+async def unverified_user(db: DBSession) -> User:
     return await user_factory(
         db=db, email="loggedin@example.com", firebase_uid="logged-in-uid"
     )
 
 
 @pytest.fixture
-async def unverified_user(db: DBSession) -> User:
-    return await user_factory(db=db)
+async def verified_user(db: DBSession) -> User:
+    return await verified_user_factory(db=db)
