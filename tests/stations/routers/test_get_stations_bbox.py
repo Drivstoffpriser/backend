@@ -7,10 +7,10 @@ from tests.conftest import AuthenticatedClient
 from tests.stations.factories import price_update_factory, station_factory
 
 BBOX_PARAMS = {
-    "min_lat": 59.90,
-    "min_lng": 10.70,
-    "max_lat": 59.93,
-    "max_lng": 10.80,
+    "minLat": 59.90,
+    "minLng": 10.70,
+    "maxLat": 59.93,
+    "maxLng": 10.80,
 }
 
 
