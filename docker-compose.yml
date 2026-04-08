@@ -25,8 +25,11 @@ services:
       - DB_NAME=drivstoffpriser
     volumes:
       - .:/app
+      - venv:/app/.venv
+    restart: on-failure
     depends_on:
       - db
 
 volumes:
   postgres_data:
+  venv:
