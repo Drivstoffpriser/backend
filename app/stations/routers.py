@@ -111,10 +111,10 @@ async def get_stations(
 async def get_stations_bbox(
     db: Annotated[DBSession, Depends(get_db_session)],
     _: Annotated[User, Depends(get_current_user)],
-    min_lat: Annotated[float, Query()],
-    min_lng: Annotated[float, Query()],
-    max_lat: Annotated[float, Query()],
-    max_lng: Annotated[float, Query()],
+    min_lat: Annotated[float, Query(alias="minLat")],
+    min_lng: Annotated[float, Query(alias="minLng")],
+    max_lat: Annotated[float, Query(alias="maxLat")],
+    max_lng: Annotated[float, Query(alias="maxLng")],
 ) -> GetStationsResponseBody:
     bbox = sa.func.ST_MakeEnvelope(min_lng, min_lat, max_lng, max_lat, 4326)
     stations = await db.fetch_all(
