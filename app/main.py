@@ -1,3 +1,4 @@
+import time
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Annotated
@@ -10,11 +11,12 @@ from apscheduler.triggers.cron import CronTrigger  # type: ignore[import-untyped
 from apscheduler.triggers.interval import (  # type: ignore[import-untyped]
     IntervalTrigger,
 )
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.db import DBSession, get_db_session
+from app.core.logging import logger
 from app.favorite_stations.routers import favorite_stations_router
 from app.stations.routers import stations_router
 from app.stations.sync import sync_prices_from_firestore, sync_stations_from_firestore
@@ -47,6 +49,18 @@ app = FastAPI(
     debug=get_settings().debug,
     lifespan=lifespan,
 )
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):  # type: ignore[no-untyped-def]
+    start = time.perf_counter()
+    response = await call_next(request)
+    ms = (time.perf_counter() - start) * 1000
+    logger.info(
+        "%s %s %d %.0fms", request.method, request.url.path, response.status_code, ms
+    )
+    return response
+
 
 app.add_middleware(
     CORSMiddleware,
