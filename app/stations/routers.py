@@ -1,3 +1,4 @@
+import datetime as dt
 from collections import defaultdict
 from datetime import datetime
 from decimal import Decimal
@@ -147,6 +148,69 @@ class RegisterPricesRequestBody(CamelCaseModel):
         if len(fuel_types) != len(set(fuel_types)):
             raise ValueError("Duplicate fuel types are not allowed")
         return v
+
+
+class PriceHistoryDaySchema(CamelCaseModel):
+    date: dt.date
+    average_price: Decimal
+
+
+class RecentUpdateSchema(CamelCaseModel):
+    id: UUID
+    fuel_type: FuelType
+    price: Decimal
+    registered_at: datetime
+
+
+class GetPriceHistoryResponseBody(CamelCaseModel):
+    history: dict[FuelType, list[PriceHistoryDaySchema]]
+    recent_updates: list[RecentUpdateSchema]
+
+
+@stations_router.get("/{station_id}/history")
+async def get_price_history(
+    station_id: UUID,
+    db: Annotated[DBSession, Depends(get_db_session)],
+    _: Annotated[User, Depends(get_current_user)],
+) -> GetPriceHistoryResponseBody:
+    date_col = sa.cast(PriceRegistration.registered_at, sa.Date).label("date")
+    avg_col = sa.func.round(sa.func.avg(PriceRegistration.price), 2).label(
+        "average_price"
+    )
+    history_result = await db.execute(
+        sa.select(PriceRegistration.fuel_type, date_col, avg_col)
+        .where(
+            PriceRegistration.station_id == station_id,
+            PriceRegistration.registered_at
+            >= sa.func.now() - sa.text("interval '30 days'"),
+        )
+        .group_by(PriceRegistration.fuel_type, date_col)
+        .order_by(PriceRegistration.fuel_type, date_col)
+    )
+    recent = await db.fetch_all(
+        sa.select(PriceRegistration)
+        .where(PriceRegistration.station_id == station_id)
+        .order_by(PriceRegistration.registered_at.desc())
+        .limit(10)
+    )
+    history: dict[FuelType, list[PriceHistoryDaySchema]] = {ft: [] for ft in FuelType}
+    for row in history_result.all():
+        history[row.fuel_type].append(
+            PriceHistoryDaySchema(date=row.date, average_price=row.average_price)
+        )
+
+    return GetPriceHistoryResponseBody(
+        history=history,
+        recent_updates=[
+            RecentUpdateSchema(
+                id=r.id,
+                fuel_type=r.fuel_type,
+                price=r.price,
+                registered_at=r.registered_at,
+            )
+            for r in recent
+        ],
+    )
 
 
 @stations_router.post("/{station_id}/prices", status_code=201)
