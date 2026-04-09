@@ -337,3 +337,182 @@ async def test_get_stations_no_estimate_when_no_priced_neighbors(
     stations = response.json()["stations"]
     assert len(stations) == 1
     assert stations[0]["prices"] == []
+
+
+async def test_sort_nearest_orders_by_distance(
+    client: AuthenticatedClient, db: DBSession, unverified_user: User
+) -> None:
+    await station_factory(db, external_id="node/far", lat=59.921, lng=10.752)
+    await station_factory(db, external_id="node/near", lat=59.912, lng=10.752)
+
+    response = await client.get(
+        "/stations/",
+        params={
+            "lat": USER_LAT,
+            "lng": USER_LNG,
+            "distance": 10_000,
+            "sort": "nearest",
+        },
+        authenticate_with=unverified_user,
+    )
+
+    assert response.status_code == 200
+    stations = response.json()["stations"]
+    assert [s["externalId"] for s in stations] == ["node/near", "node/far"]
+
+
+async def test_sort_cheapest_orders_by_price_for_fuel_type(
+    client: AuthenticatedClient, db: DBSession, unverified_user: User
+) -> None:
+    s_cheap = await station_factory(
+        db, external_id="node/cheap", lat=59.911, lng=10.752
+    )
+    s_expensive = await station_factory(
+        db, external_id="node/expensive", lat=59.912, lng=10.752
+    )
+    s_cheapest = await station_factory(
+        db, external_id="node/cheapest", lat=59.913, lng=10.752
+    )
+
+    await price_update_factory(
+        db, station_id=s_cheap.id, fuel_type=FuelType.DIESEL, price=Decimal("18.00")
+    )
+    await price_update_factory(
+        db, station_id=s_expensive.id, fuel_type=FuelType.DIESEL, price=Decimal("23.00")
+    )
+    await price_update_factory(
+        db, station_id=s_cheapest.id, fuel_type=FuelType.DIESEL, price=Decimal("17.00")
+    )
+
+    response = await client.get(
+        "/stations/",
+        params={
+            "lat": USER_LAT,
+            "lng": USER_LNG,
+            "distance": 10_000,
+            "sort": "cheapest",
+            "fuelType": "DIESEL",
+        },
+        authenticate_with=unverified_user,
+    )
+
+    assert response.status_code == 200
+    stations = response.json()["stations"]
+    assert [s["externalId"] for s in stations] == [
+        "node/cheapest",
+        "node/cheap",
+        "node/expensive",
+    ]
+
+
+async def test_sort_cheapest_puts_stations_without_price_last(
+    client: AuthenticatedClient, db: DBSession, unverified_user: User
+) -> None:
+    s_no_price = await station_factory(
+        db, external_id="node/no-price", lat=59.911, lng=10.752
+    )
+    s_priced = await station_factory(
+        db, external_id="node/priced", lat=59.912, lng=10.752
+    )
+
+    await price_update_factory(
+        db, station_id=s_priced.id, fuel_type=FuelType.DIESEL, price=Decimal("20.00")
+    )
+    # s_no_price has GASOLINE_95 but not DIESEL — should sort last for fuelType=DIESEL
+    await price_update_factory(
+        db,
+        station_id=s_no_price.id,
+        fuel_type=FuelType.GASOLINE_95,
+        price=Decimal("15.00"),
+    )
+
+    response = await client.get(
+        "/stations/",
+        params={
+            "lat": USER_LAT,
+            "lng": USER_LNG,
+            "distance": 10_000,
+            "sort": "cheapest",
+            "fuelType": "DIESEL",
+        },
+        authenticate_with=unverified_user,
+    )
+
+    assert response.status_code == 200
+    stations = response.json()["stations"]
+    assert [s["externalId"] for s in stations] == ["node/priced", "node/no-price"]
+
+
+async def test_sort_cheapest_requires_fuel_type(
+    client: AuthenticatedClient, unverified_user: User
+) -> None:
+    response = await client.get(
+        "/stations/",
+        params={
+            "lat": USER_LAT,
+            "lng": USER_LNG,
+            "distance": 10_000,
+            "sort": "cheapest",
+        },
+        authenticate_with=unverified_user,
+    )
+
+    assert response.status_code == 422
+
+
+async def test_sort_latest_orders_by_most_recent_price_update(
+    client: AuthenticatedClient, db: DBSession, unverified_user: User
+) -> None:
+    s_old = await station_factory(db, external_id="node/old", lat=59.911, lng=10.752)
+    s_new = await station_factory(db, external_id="node/new", lat=59.912, lng=10.752)
+
+    await price_update_factory(
+        db,
+        station_id=s_old.id,
+        fuel_type=FuelType.DIESEL,
+        price=Decimal("20.00"),
+        registered_at=datetime(2026, 1, 1, 12, 0, tzinfo=UTC),
+    )
+    await price_update_factory(
+        db,
+        station_id=s_new.id,
+        fuel_type=FuelType.DIESEL,
+        price=Decimal("20.00"),
+        registered_at=datetime(2026, 1, 2, 12, 0, tzinfo=UTC),
+    )
+
+    response = await client.get(
+        "/stations/",
+        params={"lat": USER_LAT, "lng": USER_LNG, "distance": 10_000, "sort": "latest"},
+        authenticate_with=unverified_user,
+    )
+
+    assert response.status_code == 200
+    stations = response.json()["stations"]
+    assert [s["externalId"] for s in stations] == ["node/new", "node/old"]
+
+
+async def test_sort_latest_puts_stations_without_prices_last(
+    client: AuthenticatedClient, db: DBSession, unverified_user: User
+) -> None:
+    s_no_prices = await station_factory(
+        db, external_id="node/no-prices", lat=59.911, lng=10.752
+    )
+    s_priced = await station_factory(
+        db, external_id="node/priced", lat=59.912, lng=10.752
+    )
+
+    await price_update_factory(
+        db, station_id=s_priced.id, fuel_type=FuelType.DIESEL, price=Decimal("20.00")
+    )
+    _ = s_no_prices  # registered but never given a price
+
+    response = await client.get(
+        "/stations/",
+        params={"lat": USER_LAT, "lng": USER_LNG, "distance": 10_000, "sort": "latest"},
+        authenticate_with=unverified_user,
+    )
+
+    assert response.status_code == 200
+    stations = response.json()["stations"]
+    assert [s["externalId"] for s in stations] == ["node/priced", "node/no-prices"]

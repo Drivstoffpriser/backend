@@ -2,11 +2,12 @@ import datetime as dt
 from collections import defaultdict
 from datetime import datetime
 from decimal import Decimal
+from enum import StrEnum
 from typing import Annotated, NamedTuple
 from uuid import UUID
 
 import sqlalchemy as sa
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi_limiter.depends import RateLimiter
 from geoalchemy2 import Geometry
 from pydantic import Field, field_validator
@@ -18,6 +19,13 @@ from app.core.schemas import CamelCaseModel, LocationSchema
 from app.stations.enums import FuelType, ProviderType
 from app.stations.models import PriceRegistration, Station
 from app.users.models import User
+
+
+class StationSortType(StrEnum):
+    NEAREST = "nearest"
+    CHEAPEST = "cheapest"
+    LATEST = "latest"
+
 
 stations_router = APIRouter(
     prefix="/stations",
@@ -160,14 +168,52 @@ async def get_stations(
     lat: Annotated[float, Query()],
     lng: Annotated[float, Query()],
     distance: Annotated[float, Query(gt=0, description="Max distance in meters")],
+    sort: Annotated[StationSortType, Query()] = StationSortType.NEAREST,
+    fuel_type: Annotated[FuelType | None, Query(alias="fuelType")] = None,
 ) -> GetStationsResponseBody:
+    if sort == StationSortType.CHEAPEST and fuel_type is None:
+        raise HTTPException(
+            status_code=422, detail="fuelType is required when sort=cheapest"
+        )
+
     user_point = sa.func.ST_GeogFromText(f"POINT({lng} {lat})")
-    stations = await db.fetch_all(
-        sa.select(Station)
-        .where(sa.func.ST_DWithin(Station.location, user_point, distance))
-        .order_by(sa.func.ST_Distance(Station.location, user_point))
-        .limit(50)
+    base_query = sa.select(Station).where(
+        sa.func.ST_DWithin(Station.location, user_point, distance)
     )
+
+    match sort:
+        case StationSortType.NEAREST:
+            query = base_query.order_by(
+                sa.func.ST_Distance(Station.location, user_point)
+            )
+        case StationSortType.CHEAPEST:
+            price_subq = (
+                sa.select(PriceRegistration.station_id, PriceRegistration.price)
+                .where(
+                    PriceRegistration.is_latest.is_(True),
+                    PriceRegistration.fuel_type == fuel_type,
+                )
+                .subquery()
+            )
+            query = base_query.outerjoin(
+                price_subq, Station.id == price_subq.c.station_id
+            ).order_by(sa.nulls_last(price_subq.c.price.asc()))
+        case StationSortType.LATEST:
+            latest_subq = (
+                sa.select(
+                    PriceRegistration.station_id,
+                    sa.func.max(PriceRegistration.registered_at).label("latest_at"),
+                )
+                .group_by(PriceRegistration.station_id)
+                .subquery()
+            )
+            query = base_query.outerjoin(
+                latest_subq, Station.id == latest_subq.c.station_id
+            ).order_by(sa.nulls_last(latest_subq.c.latest_at.desc()))
+        case _:
+            raise HTTPException(status_code=422, detail="Invalid sort type")
+
+    stations = await db.fetch_all(query.limit(50))
     prices_by_station = await _fetch_latest_prices(db, [s.id for s in stations])
     unpriced_station_ids = [s.id for s in stations if s.id not in prices_by_station]
     estimates_by_station = await _fetch_estimated_prices(db, unpriced_station_ids)
