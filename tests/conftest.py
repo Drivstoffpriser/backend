@@ -81,7 +81,6 @@ def setup_database() -> Generator[None]:
     asyncio.run(_run(Base.metadata.drop_all))
     asyncio.run(_run(Base.metadata.create_all))
     yield
-    asyncio.run(_run(Base.metadata.drop_all))
 
 
 @pytest.fixture
