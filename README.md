@@ -42,6 +42,7 @@ task database:migrate         # apply all Alembic migrations
 task database:seed            # seed stations and price history
 task database:seed:stations   # seed station data only
 task database:seed:prices     # seed sample price history only
+task lint                     # run ruff (format, check) and mypy
 ```
 
 ## Development
