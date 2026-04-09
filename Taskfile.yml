@@ -4,17 +4,33 @@ env:
   PYTHONPATH: .
 
 tasks:
+  database:default:
+    desc: Start postgres, apply migrations, and seed all data
+    cmds:
+      - task: database:initialize
+      - task: database:seed
+
   database:initialize:
-    desc: Start postgres, apply schema migrations, and seed test data
+    desc: Start postgres and apply schema migrations
     cmds:
       - task: database:start
       - task: database:migrate
-      - task: database:seed
 
   database:seed:
+    desc: Seed the database with stations and price history
+    cmds:
+      - task: database:seed:stations
+      - task: database:seed:prices
+
+  database:seed:stations:
     desc: Seed the database with station data
     cmds:
       - uv run python scripts/seed.py
+
+  database:seed:prices:
+    desc: Seed the database with sample price history data
+    cmds:
+      - docker compose exec db psql -U dummy_postgres_user -d drivstoffpriser -f /dev/stdin < scripts/seed_random_prices.sql
 
   database:start:
     desc: Start postgres and wait until it is ready to accept connections
