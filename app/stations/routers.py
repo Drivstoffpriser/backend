@@ -7,8 +7,10 @@ from uuid import UUID
 
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, Query
+from fastapi_limiter.depends import RateLimiter
 from geoalchemy2 import Geometry
 from pydantic import Field, field_validator
+from pyrate_limiter import Duration, Limiter, Rate
 
 from app.core.auth import get_current_user, get_logged_in_user
 from app.core.db import DBSession, get_db_session
@@ -17,7 +19,13 @@ from app.stations.enums import FuelType, ProviderType
 from app.stations.models import PriceRegistration, Station
 from app.users.models import User
 
-stations_router = APIRouter(prefix="/stations", tags=["stations"])
+stations_router = APIRouter(
+    prefix="/stations",
+    tags=["stations"],
+    dependencies=[
+        Depends(RateLimiter(limiter=Limiter(Rate(10, Duration.SECOND * 10))))
+    ],
+)
 
 
 class EstimatedPrice(NamedTuple):
@@ -158,6 +166,7 @@ async def get_stations(
         sa.select(Station)
         .where(sa.func.ST_DWithin(Station.location, user_point, distance))
         .order_by(sa.func.ST_Distance(Station.location, user_point))
+        .limit(50)
     )
     prices_by_station = await _fetch_latest_prices(db, [s.id for s in stations])
     unpriced_station_ids = [s.id for s in stations if s.id not in prices_by_station]
@@ -284,6 +293,10 @@ async def register_prices(
     body: RegisterPricesRequestBody,
     db: Annotated[DBSession, Depends(get_db_session)],
     logged_in_user: Annotated[User, Depends(get_logged_in_user)],
+    _: Annotated[
+        RateLimiter,
+        Depends(RateLimiter(limiter=Limiter(Rate(1, Duration.SECOND * 30)))),
+    ],
 ) -> None:
     fuel_types = [r.fuel_type for r in body.registrations]
     await db.execute(
