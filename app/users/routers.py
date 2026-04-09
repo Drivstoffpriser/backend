@@ -3,6 +3,8 @@ from uuid import UUID
 
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends
+from fastapi_limiter.depends import RateLimiter
+from pyrate_limiter import Duration, Limiter, Rate
 
 from app.core.auth import get_current_user as get_authenticated_user
 from app.core.db import DBSession, get_db_session
@@ -10,7 +12,13 @@ from app.core.schemas import CamelCaseModel
 from app.stations.models import PriceRegistration
 from app.users.models import User
 
-users_router = APIRouter(prefix="/users", tags=["users"])
+users_router = APIRouter(
+    prefix="/users",
+    tags=["users"],
+    dependencies=[
+        Depends(RateLimiter(limiter=Limiter(Rate(10, Duration.SECOND * 10))))
+    ],
+)
 
 
 class GetCurrentUserResponseBody(CamelCaseModel):

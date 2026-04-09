@@ -3,6 +3,7 @@ from collections.abc import AsyncGenerator, Callable, Generator
 from typing import Any
 
 import pytest
+from fastapi_limiter.depends import RateLimiter
 from httpx import ASGITransport, AsyncClient, Response
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.pool import NullPool
@@ -104,10 +105,24 @@ async def client(db: DBSession) -> AsyncGenerator[AuthenticatedClient]:
         yield db
 
     app.dependency_overrides[get_db_session] = override_db
+
+    def walk_dependant(dependant: Any) -> None:
+        if dependant.call and isinstance(dependant.call, RateLimiter):
+            app.dependency_overrides[dependant.call] = lambda: None
+        for sub in getattr(dependant, "dependencies", []):
+            walk_dependant(sub)
+
+    for route in app.routes:
+        if hasattr(route, "dependant"):
+            walk_dependant(route.dependant)
+
+    # Create client
     async with AuthenticatedClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as c:
         yield c
+
+    # Clear overrides after test
     app.dependency_overrides.clear()
 
 
