@@ -47,3 +47,10 @@ tasks:
         fi
       - uv run python scripts/reset_db.py
       - uv run alembic upgrade head
+
+  lint:
+    desc: Run ruff (format, check) and mypy
+    cmds:
+      - uv run ruff format
+      - uv run ruff check . --fix
+      - uv run mypy .
