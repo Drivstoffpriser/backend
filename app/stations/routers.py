@@ -2,7 +2,7 @@ import datetime as dt
 from collections import defaultdict
 from datetime import datetime
 from decimal import Decimal
-from typing import Annotated
+from typing import Annotated, NamedTuple
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -20,10 +20,15 @@ from app.users.models import User
 stations_router = APIRouter(prefix="/stations", tags=["stations"])
 
 
+class EstimatedPrice(NamedTuple):
+    fuel_type: FuelType
+    price: Decimal
+
+
 class PriceSchema(CamelCaseModel):
     fuel_type: FuelType
     price: Decimal
-    registered_at: datetime
+    registered_at: datetime | None
 
 
 class StationSchema(CamelCaseModel):
@@ -45,8 +50,10 @@ class GetStationsResponseBody(CamelCaseModel):
         cls,
         stations: list[Station],
         prices_by_station: dict[UUID, list[PriceRegistration]] | None = None,
+        estimates_by_station: dict[UUID, list[EstimatedPrice]] | None = None,
     ) -> GetStationsResponseBody:
         prices_by_station = prices_by_station or {}
+        estimates_by_station = estimates_by_station or {}
         return cls(
             stations=[
                 StationSchema(
@@ -64,6 +71,14 @@ class GetStationsResponseBody(CamelCaseModel):
                             registered_at=p.registered_at,
                         )
                         for p in prices_by_station.get(station.id, [])
+                    ]
+                    + [
+                        PriceSchema(
+                            fuel_type=e.fuel_type,
+                            price=e.price,
+                            registered_at=None,
+                        )
+                        for e in estimates_by_station.get(station.id, [])
                     ],
                 )
                 for station in stations
@@ -90,6 +105,46 @@ async def _fetch_latest_prices(
     return result
 
 
+async def _fetch_estimated_prices(
+    db: DBSession, station_ids: list[UUID]
+) -> dict[UUID, list[EstimatedPrice]]:
+    """For each station without real prices, average the 5 nearest stations'
+    prices per fuel type using a PostGIS LATERAL join."""
+    if not station_ids:
+        return {}
+
+    result = await db.execute(
+        sa.text("""
+            SELECT
+                sne.id       AS station_id,
+                ft.fuel_type,
+                ROUND(AVG(nearby.price), 2) AS price
+            FROM station sne
+            CROSS JOIN (VALUES ('DIESEL'), ('GASOLINE_95')) AS ft(fuel_type)
+            CROSS JOIN LATERAL (
+                SELECT pr.price
+                FROM price_registration pr
+                JOIN station s2 ON s2.id = pr.station_id
+                WHERE pr.is_latest = true
+                  AND pr.fuel_type = ft.fuel_type
+                  AND s2.id != sne.id
+                ORDER BY ST_Distance(sne.location, s2.location)
+                LIMIT 5
+            ) nearby
+            WHERE sne.id = ANY(:station_ids)
+            GROUP BY sne.id, ft.fuel_type
+        """).bindparams(
+            sa.bindparam("station_ids", value=station_ids, type_=sa.ARRAY(sa.Uuid))
+        )
+    )
+    estimates: dict[UUID, list[EstimatedPrice]] = defaultdict(list)
+    for row in result.all():
+        estimates[row.station_id].append(
+            EstimatedPrice(fuel_type=row.fuel_type, price=row.price)
+        )
+    return estimates
+
+
 @stations_router.get("/")
 async def get_stations(
     db: Annotated[DBSession, Depends(get_db_session)],
@@ -105,7 +160,12 @@ async def get_stations(
         .order_by(sa.func.ST_Distance(Station.location, user_point))
     )
     prices_by_station = await _fetch_latest_prices(db, [s.id for s in stations])
-    return GetStationsResponseBody.from_models(stations, prices_by_station)
+    unpriced_station_ids = [s.id for s in stations if s.id not in prices_by_station]
+    estimates_by_station = await _fetch_estimated_prices(db, unpriced_station_ids)
+
+    return GetStationsResponseBody.from_models(
+        stations, prices_by_station, estimates_by_station
+    )
 
 
 @stations_router.get("/bbox")
@@ -124,7 +184,12 @@ async def get_stations_bbox(
         )
     )
     prices_by_station = await _fetch_latest_prices(db, [s.id for s in stations])
-    return GetStationsResponseBody.from_models(stations, prices_by_station)
+    unpriced_station_ids = [s.id for s in stations if s.id not in prices_by_station]
+    estimates_by_station = await _fetch_estimated_prices(db, unpriced_station_ids)
+
+    return GetStationsResponseBody.from_models(
+        stations, prices_by_station, estimates_by_station
+    )
 
 
 PRICE_MIN = Decimal("10")
