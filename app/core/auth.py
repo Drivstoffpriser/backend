@@ -29,6 +29,7 @@ def get_firebase_app() -> firebase_admin.App:
         )
     else:
         cred = firebase_admin.credentials.ApplicationDefault()
+
     return firebase_admin.initialize_app(cred)
 
 
@@ -67,16 +68,17 @@ async def get_current_user(
     result = await db.execute(
         pg_insert(User)
         .values(insert_values)
-        .on_conflict_do_nothing(index_elements=[User.firebase_uid])
+        .on_conflict_do_update(
+            index_elements=[User.firebase_uid],
+            set_={
+                User.email: email,
+                User.display_name: display_name,
+            },
+        )
         .returning(User)
     )
-    user: User | None = result.scalars().one_or_none()
-    if user is not None:
-        await db.commit()
-        return user
-
-    existing: User = await db.fetch_one(sa.select(User).where(User.firebase_uid == uid))
-    if existing.verified_at is None and email_verified:
+    user: User = result.scalars().one()
+    if email_verified and user.verified_at is None:
         result = await db.execute(
             sa.update(User)
             .where(User.firebase_uid == uid)
@@ -85,7 +87,9 @@ async def get_current_user(
         )
         await db.commit()
         return cast(User, result.scalars().one())
-    return existing
+
+    await db.commit()
+    return user
 
 
 async def get_logged_in_user(
@@ -96,6 +100,7 @@ async def get_logged_in_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Email required",
         )
+
     return user
 
 
@@ -106,4 +111,5 @@ async def get_verified_user(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Email not verified"
         )
+
     return user

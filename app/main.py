@@ -50,6 +50,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=get_settings().allowed_origins,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):  # type: ignore[no-untyped-def]
@@ -61,13 +68,6 @@ async def log_requests(request: Request, call_next):  # type: ignore[no-untyped-
     )
     return response
 
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=get_settings().allowed_origins,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 app.include_router(favorite_stations_router)
 app.include_router(stations_router)
