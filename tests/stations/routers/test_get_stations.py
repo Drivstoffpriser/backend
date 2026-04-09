@@ -207,3 +207,133 @@ async def test_get_stations_only_includes_prices_for_own_station(
 
     assert by_external_id["node/1"]["prices"][0]["price"] == "20.00"
     assert by_external_id["node/2"]["prices"][0]["price"] == "25.00"
+
+
+async def test_get_stations_estimates_prices_for_station_without_prices(
+    client: AuthenticatedClient, db: DBSession, unverified_user: User
+) -> None:
+    # Station without prices — should get estimates from nearby priced stations
+    await station_factory(db, external_id="node/target", lat=59.911, lng=10.752)
+    neighbor1 = await station_factory(
+        db, external_id="node/n1", address="N1", lat=59.912, lng=10.752
+    )
+    neighbor2 = await station_factory(
+        db, external_id="node/n2", address="N2", lat=59.913, lng=10.752
+    )
+
+    await price_update_factory(
+        db, station_id=neighbor1.id, fuel_type=FuelType.DIESEL, price=Decimal("20.00")
+    )
+    await price_update_factory(
+        db, station_id=neighbor2.id, fuel_type=FuelType.DIESEL, price=Decimal("22.00")
+    )
+    await price_update_factory(
+        db,
+        station_id=neighbor1.id,
+        fuel_type=FuelType.GASOLINE_95,
+        price=Decimal("24.00"),
+    )
+
+    response = await client.get(
+        "/stations/",
+        params={"lat": USER_LAT, "lng": USER_LNG, "distance": 10_000},
+        authenticate_with=unverified_user,
+    )
+
+    assert response.status_code == 200
+    by_external_id = {s["externalId"]: s for s in response.json()["stations"]}
+    target_prices = {p["fuelType"]: p for p in by_external_id["node/target"]["prices"]}
+
+    # DIESEL: avg of 20.00 and 22.00 = 21.00
+    assert target_prices["DIESEL"]["price"] == "21.00"
+    assert target_prices["DIESEL"]["registeredAt"] is None
+
+    # GASOLINE_95: only one neighbor has it, so estimate is 24.00
+    assert target_prices["GASOLINE_95"]["price"] == "24.00"
+    assert target_prices["GASOLINE_95"]["registeredAt"] is None
+
+    # GASOLINE_98: never estimated
+    assert "GASOLINE_98" not in target_prices
+
+
+async def test_get_stations_real_prices_unaffected_by_estimation(
+    client: AuthenticatedClient, db: DBSession, unverified_user: User
+) -> None:
+    # Station with real prices — should NOT get estimates mixed in
+    priced = await station_factory(
+        db, external_id="node/priced", lat=59.911, lng=10.752
+    )
+    neighbor = await station_factory(
+        db, external_id="node/neighbor", address="N1", lat=59.912, lng=10.752
+    )
+
+    await price_update_factory(
+        db, station_id=priced.id, fuel_type=FuelType.DIESEL, price=Decimal("19.00")
+    )
+    await price_update_factory(
+        db, station_id=neighbor.id, fuel_type=FuelType.DIESEL, price=Decimal("25.00")
+    )
+    await price_update_factory(
+        db,
+        station_id=neighbor.id,
+        fuel_type=FuelType.GASOLINE_95,
+        price=Decimal("26.00"),
+    )
+
+    response = await client.get(
+        "/stations/",
+        params={"lat": USER_LAT, "lng": USER_LNG, "distance": 10_000},
+        authenticate_with=unverified_user,
+    )
+
+    by_external_id = {s["externalId"]: s for s in response.json()["stations"]}
+    priced_prices = {p["fuelType"]: p for p in by_external_id["node/priced"]["prices"]}
+
+    # Only the real DIESEL price — no GASOLINE_95 estimate leaking in
+    assert set(priced_prices.keys()) == {"DIESEL"}
+    assert priced_prices["DIESEL"]["price"] == "19.00"
+    assert priced_prices["DIESEL"]["registeredAt"] is not None
+
+
+async def test_get_stations_only_estimates_diesel_and_gasoline_95(
+    client: AuthenticatedClient, db: DBSession, unverified_user: User
+) -> None:
+    # Estimation should only cover DIESEL and GASOLINE_95, not GASOLINE_98
+    await station_factory(db, external_id="node/target", lat=59.911, lng=10.752)
+    neighbor = await station_factory(
+        db, external_id="node/neighbor", address="N1", lat=59.912, lng=10.752
+    )
+
+    await price_update_factory(
+        db,
+        station_id=neighbor.id,
+        fuel_type=FuelType.GASOLINE_98,
+        price=Decimal("28.00"),
+    )
+
+    response = await client.get(
+        "/stations/",
+        params={"lat": USER_LAT, "lng": USER_LNG, "distance": 10_000},
+        authenticate_with=unverified_user,
+    )
+
+    assert response.status_code == 200
+    by_external_id = {s["externalId"]: s for s in response.json()["stations"]}
+    assert by_external_id["node/target"]["prices"] == []
+
+
+async def test_get_stations_no_estimate_when_no_priced_neighbors(
+    client: AuthenticatedClient, db: DBSession, unverified_user: User
+) -> None:
+    # Station without prices and no nearby priced stations — prices should be empty
+    await station_factory(db, external_id="node/lonely", lat=59.911, lng=10.752)
+
+    response = await client.get(
+        "/stations/",
+        params={"lat": USER_LAT, "lng": USER_LNG, "distance": 10_000},
+        authenticate_with=unverified_user,
+    )
+
+    stations = response.json()["stations"]
+    assert len(stations) == 1
+    assert stations[0]["prices"] == []
