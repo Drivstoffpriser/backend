@@ -47,7 +47,7 @@ class PriceSchema(CamelCaseModel):
     registered_at: datetime | None
 
 
-class StationSchema(CamelCaseModel):
+class StationBaseSchema(CamelCaseModel):
     id: UUID
     external_id: str
     name: str
@@ -55,6 +55,9 @@ class StationSchema(CamelCaseModel):
     address: str
     city: str
     location: LocationSchema
+
+
+class StationSchema(StationBaseSchema):
     prices: list[PriceSchema] = []
 
 
@@ -244,6 +247,38 @@ async def get_stations_bbox(
 
     return GetStationsResponseBody.from_models(
         stations, prices_by_station, estimates_by_station
+    )
+
+
+class SearchStationsResponseBody(CamelCaseModel):
+    stations: list[StationBaseSchema]
+
+
+@stations_router.get("/search")
+async def search_stations(
+    db: Annotated[DBSession, Depends(get_db_session)],
+    _: Annotated[User, Depends(get_current_user)],
+    query: Annotated[str, Query(min_length=1)],
+) -> SearchStationsResponseBody:
+    stations = await db.fetch_all(
+        sa.select(Station)
+        .where(sa.func.similarity(Station.name, query) > 0.1)
+        .order_by(sa.func.similarity(Station.name, query).desc())
+        .limit(20)
+    )
+    return SearchStationsResponseBody(
+        stations=[
+            StationBaseSchema(
+                id=s.id,
+                external_id=s.external_id,
+                name=s.name,
+                provider=s.provider,
+                address=s.address,
+                city=s.city,
+                location=LocationSchema.from_wkb(s.location),
+            )
+            for s in stations
+        ]
     )
 
 
