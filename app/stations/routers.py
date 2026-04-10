@@ -161,7 +161,7 @@ async def _fetch_estimated_prices(
     return estimates
 
 
-@stations_router.get("/")
+@stations_router.get("")
 async def get_stations(
     db: Annotated[DBSession, Depends(get_db_session)],
     _: Annotated[User, Depends(get_current_user)],

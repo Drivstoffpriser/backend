@@ -35,7 +35,7 @@ async def test_get_stations_returns_stations(
     )
 
     response = await client.get(
-        "/stations/",
+        "/stations",
         params={"lat": USER_LAT, "lng": USER_LNG, "distance": 10_000},
         authenticate_with=unverified_user,
     )
@@ -60,7 +60,7 @@ async def test_get_stations_empty(
     client: AuthenticatedClient, unverified_user: User
 ) -> None:
     response = await client.get(
-        "/stations/",
+        "/stations",
         params={"lat": USER_LAT, "lng": USER_LNG, "distance": 10_000},
         authenticate_with=unverified_user,
     )
@@ -90,7 +90,7 @@ async def test_get_stations_filters_by_distance(
     )
 
     response = await client.get(
-        "/stations/",
+        "/stations",
         params={"lat": USER_LAT, "lng": USER_LNG, "distance": 5_000},
         authenticate_with=unverified_user,
     )
@@ -124,7 +124,7 @@ async def test_get_stations_ordered_by_distance(
     )
 
     response = await client.get(
-        "/stations/",
+        "/stations",
         params={"lat": USER_LAT, "lng": USER_LNG, "distance": 10_000},
         authenticate_with=unverified_user,
     )
@@ -167,7 +167,7 @@ async def test_get_stations_includes_latest_prices(
     )
 
     response = await client.get(
-        "/stations/",
+        "/stations",
         params={"lat": USER_LAT, "lng": USER_LNG, "distance": 10_000},
         authenticate_with=unverified_user,
     )
@@ -197,7 +197,7 @@ async def test_get_stations_only_includes_prices_for_own_station(
     )
 
     response = await client.get(
-        "/stations/",
+        "/stations",
         params={"lat": USER_LAT, "lng": USER_LNG, "distance": 10_000},
         authenticate_with=unverified_user,
     )
@@ -235,7 +235,7 @@ async def test_get_stations_estimates_prices_for_station_without_prices(
     )
 
     response = await client.get(
-        "/stations/",
+        "/stations",
         params={"lat": USER_LAT, "lng": USER_LNG, "distance": 10_000},
         authenticate_with=unverified_user,
     )
@@ -281,7 +281,7 @@ async def test_get_stations_real_prices_unaffected_by_estimation(
     )
 
     response = await client.get(
-        "/stations/",
+        "/stations",
         params={"lat": USER_LAT, "lng": USER_LNG, "distance": 10_000},
         authenticate_with=unverified_user,
     )
@@ -312,7 +312,7 @@ async def test_get_stations_only_estimates_diesel_and_gasoline_95(
     )
 
     response = await client.get(
-        "/stations/",
+        "/stations",
         params={"lat": USER_LAT, "lng": USER_LNG, "distance": 10_000},
         authenticate_with=unverified_user,
     )
@@ -329,7 +329,7 @@ async def test_get_stations_no_estimate_when_no_priced_neighbors(
     await station_factory(db, external_id="node/lonely", lat=59.911, lng=10.752)
 
     response = await client.get(
-        "/stations/",
+        "/stations",
         params={"lat": USER_LAT, "lng": USER_LNG, "distance": 10_000},
         authenticate_with=unverified_user,
     )
@@ -346,7 +346,7 @@ async def test_sort_nearest_orders_by_distance(
     await station_factory(db, external_id="node/near", lat=59.912, lng=10.752)
 
     response = await client.get(
-        "/stations/",
+        "/stations",
         params={
             "lat": USER_LAT,
             "lng": USER_LNG,
@@ -385,7 +385,7 @@ async def test_sort_cheapest_orders_by_price_for_fuel_type(
     )
 
     response = await client.get(
-        "/stations/",
+        "/stations",
         params={
             "lat": USER_LAT,
             "lng": USER_LNG,
@@ -427,7 +427,7 @@ async def test_sort_cheapest_puts_stations_without_price_last(
     )
 
     response = await client.get(
-        "/stations/",
+        "/stations",
         params={
             "lat": USER_LAT,
             "lng": USER_LNG,
@@ -447,7 +447,7 @@ async def test_sort_cheapest_requires_fuel_type(
     client: AuthenticatedClient, unverified_user: User
 ) -> None:
     response = await client.get(
-        "/stations/",
+        "/stations",
         params={
             "lat": USER_LAT,
             "lng": USER_LNG,
@@ -482,7 +482,7 @@ async def test_sort_latest_orders_by_most_recent_price_update(
     )
 
     response = await client.get(
-        "/stations/",
+        "/stations",
         params={"lat": USER_LAT, "lng": USER_LNG, "distance": 10_000, "sort": "latest"},
         authenticate_with=unverified_user,
     )
@@ -508,7 +508,7 @@ async def test_sort_latest_puts_stations_without_prices_last(
     _ = s_no_prices  # registered but never given a price
 
     response = await client.get(
-        "/stations/",
+        "/stations",
         params={"lat": USER_LAT, "lng": USER_LNG, "distance": 10_000, "sort": "latest"},
         authenticate_with=unverified_user,
     )
