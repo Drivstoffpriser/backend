@@ -3,8 +3,6 @@ from typing import Annotated
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi_limiter.depends import RateLimiter
-from pyrate_limiter import Duration, Limiter, Rate
 
 from app.core.auth import get_logged_in_user
 from app.core.config import get_settings
@@ -14,7 +12,6 @@ from app.users.models import User
 tools_router = APIRouter(
     prefix="/tools",
     tags=["tools"],
-    dependencies=[Depends(RateLimiter(limiter=Limiter(Rate(1, Duration.SECOND * 10))))],
 )
 
 _ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
