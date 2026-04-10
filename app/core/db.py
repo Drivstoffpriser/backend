@@ -56,7 +56,7 @@ class DBSession:
 class Database:
     def __init__(self) -> None:
         settings = get_settings()
-        self._engine = create_async_engine(settings.database_url, echo=settings.debug)
+        self._engine = create_async_engine(settings.database_url, echo=False)
         self._session_factory = async_sessionmaker(
             self._engine,
             class_=AsyncSession,
