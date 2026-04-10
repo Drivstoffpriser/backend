@@ -13,7 +13,7 @@ SELECT
   s.id,
   fuel_type,
   round((18 + random() * 6) :: numeric, 2),
-  NOW() - (random() * 3 || ' days') :: INTERVAL,
+  NOW() - make_interval(secs => (random() * 3 * 86400)::int),
   NULL,
   false
 FROM
