@@ -235,7 +235,15 @@ async def get_stations_bbox(
     max_lat: Annotated[float, Query(alias="maxLat")],
     max_lng: Annotated[float, Query(alias="maxLng")],
 ) -> GetStationsResponseBody:
-    bbox = sa.func.ST_MakeEnvelope(min_lng, min_lat, max_lng, max_lat, 4326)
+    lat_padding = (max_lat - min_lat) / 2
+    lng_padding = (max_lng - min_lng) / 2
+    bbox = sa.func.ST_MakeEnvelope(
+        min_lng - lng_padding,
+        min_lat - lat_padding,
+        max_lng + lng_padding,
+        max_lat + lat_padding,
+        4326,
+    )
     stations = await db.fetch_all(
         sa.select(Station).where(
             sa.func.ST_Within(sa.cast(Station.location, Geometry(srid=4326)), bbox)
