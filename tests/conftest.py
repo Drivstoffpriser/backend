@@ -1,8 +1,9 @@
 import asyncio
-from collections.abc import AsyncGenerator, Callable, Generator
+from collections.abc import AsyncGenerator, Generator
 from typing import Any
 
 import pytest
+import sqlalchemy as sa
 from fastapi_limiter.depends import RateLimiter
 from httpx import ASGITransport, AsyncClient, Response
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
@@ -73,14 +74,15 @@ class AuthenticatedClient(AsyncClient):
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_database() -> Generator[None]:
-    async def _run(coro: Callable[..., None]) -> None:
+    async def _setup() -> None:
         engine = create_async_engine(get_settings().database_url)
         async with engine.begin() as conn:
-            await conn.run_sync(coro)
+            await conn.execute(sa.text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
+            await conn.run_sync(Base.metadata.drop_all)
+            await conn.run_sync(Base.metadata.create_all)
         await engine.dispose()
 
-    asyncio.run(_run(Base.metadata.drop_all))
-    asyncio.run(_run(Base.metadata.create_all))
+    asyncio.run(_setup())
     yield
 
 
