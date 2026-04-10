@@ -382,10 +382,6 @@ async def register_prices(
     body: RegisterPricesRequestBody,
     db: Annotated[DBSession, Depends(get_db_session)],
     logged_in_user: Annotated[User, Depends(get_logged_in_user)],
-    _: Annotated[
-        RateLimiter,
-        Depends(RateLimiter(limiter=Limiter(Rate(1, Duration.SECOND * 30)))),
-    ],
 ) -> None:
     fuel_types = [r.fuel_type for r in body.registrations]
     await db.execute(
