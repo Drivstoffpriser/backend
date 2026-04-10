@@ -112,6 +112,70 @@ async def test_get_stations_bbox_includes_prices(
     assert prices[FuelType.GASOLINE_95]["price"] == "22.90"
 
 
+async def test_get_stations_bbox_includes_stations_within_padding(
+    client: AuthenticatedClient, db: DBSession, unverified_user: User
+) -> None:
+    # BBOX_PARAMS: minLat=59.90, maxLat=59.93 → lat_padding=0.015 → padded max=59.945
+    # Station at 59.94 is outside the raw bbox but inside the padded bbox
+    await station_factory(
+        db,
+        external_id="node/inside",
+        name="Inside Station",
+        address="Inside St 1",
+        lat=59.911,
+        lng=10.752,
+    )
+    await station_factory(
+        db,
+        external_id="node/padded",
+        name="Padded Station",
+        address="Padded St 1",
+        lat=59.940,  # outside raw bbox (max 59.93), inside padded bbox (max 59.945)
+        lng=10.752,
+    )
+
+    response = await client.get(
+        "/stations/bbox", params=BBOX_PARAMS, authenticate_with=unverified_user
+    )
+
+    assert response.status_code == 200
+    external_ids = {s["externalId"] for s in response.json()["stations"]}
+    assert "node/inside" in external_ids
+    assert "node/padded" in external_ids
+
+
+async def test_get_stations_bbox_excludes_stations_outside_padding(
+    client: AuthenticatedClient, db: DBSession, unverified_user: User
+) -> None:
+    # BBOX_PARAMS: minLat=59.90, maxLat=59.93 → lat_padding=0.015 → padded max=59.945
+    # Station at 59.96 is outside the padded bbox
+    await station_factory(
+        db,
+        external_id="node/inside",
+        name="Inside Station",
+        address="Inside St 1",
+        lat=59.911,
+        lng=10.752,
+    )
+    await station_factory(
+        db,
+        external_id="node/outside",
+        name="Outside Station",
+        address="Outside St 1",
+        lat=59.960,  # outside padded bbox (max 59.945)
+        lng=10.752,
+    )
+
+    response = await client.get(
+        "/stations/bbox", params=BBOX_PARAMS, authenticate_with=unverified_user
+    )
+
+    assert response.status_code == 200
+    external_ids = {s["externalId"] for s in response.json()["stations"]}
+    assert "node/inside" in external_ids
+    assert "node/outside" not in external_ids
+
+
 async def test_get_stations_bbox_only_returns_latest_prices(
     client: AuthenticatedClient, db: DBSession, unverified_user: User
 ) -> None:
