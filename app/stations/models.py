@@ -31,6 +31,12 @@ class Station(Base):
     location: Mapped[WKBElement] = mapped_column(
         Geography(geometry_type="POINT", srid=4326, spatial_index=False)
     )
+    registered_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=sa.func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=sa.func.now()
+    )
 
 
 class PriceRegistration(Base):

@@ -6,6 +6,7 @@ from decimal import Decimal
 from uuid import UUID
 
 import sqlalchemy as sa
+from geoalchemy2 import Geometry
 from geoalchemy2.elements import WKTElement
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
@@ -75,6 +76,24 @@ async def sync_stations_from_firestore() -> None:
                                 "address": stmt.excluded.address,
                                 "city": stmt.excluded.city,
                                 "location": stmt.excluded.location,
+                                "updated_at": sa.case(
+                                    (
+                                        sa.or_(
+                                            Station.name != stmt.excluded.name,
+                                            Station.provider != stmt.excluded.provider,
+                                            Station.address != stmt.excluded.address,
+                                            Station.city != stmt.excluded.city,
+                                            ~sa.func.ST_Equals(
+                                                sa.cast(Station.location, Geometry),
+                                                sa.cast(
+                                                    stmt.excluded.location, Geometry
+                                                ),
+                                            ),
+                                        ),
+                                        sa.func.now(),
+                                    ),
+                                    else_=Station.updated_at,
+                                ),
                             },
                         )
                     )
