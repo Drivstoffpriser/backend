@@ -366,6 +366,50 @@ async def get_last_updated(
     return LastUpdatedSchema(last_updated_at=last_updated_at)
 
 
+class StationPricesSchema(CamelCaseModel):
+    station_id: UUID
+    prices: list[PriceSchema] = []
+
+
+class GetPricesByStationIdsResponseBody(CamelCaseModel):
+    stations: list[StationPricesSchema]
+
+
+@stations_router.get("/prices")
+async def get_prices_by_station_ids(
+    db: Annotated[DBSession, Depends(get_db_session)],
+    _: Annotated[User, Depends(get_current_user)],
+    station_ids: Annotated[list[UUID], Query(alias="stationIds")],
+) -> GetPricesByStationIdsResponseBody:
+    prices_by_station = await _fetch_latest_prices(db, station_ids)
+    unpriced_ids = [sid for sid in station_ids if sid not in prices_by_station]
+    estimates_by_station = await _fetch_estimated_prices(db, unpriced_ids)
+    return GetPricesByStationIdsResponseBody(
+        stations=[
+            StationPricesSchema(
+                station_id=sid,
+                prices=[
+                    PriceSchema(
+                        fuel_type=p.fuel_type,
+                        price=p.price,
+                        registered_at=p.registered_at,
+                    )
+                    for p in prices_by_station.get(sid, [])
+                ]
+                + [
+                    PriceSchema(
+                        fuel_type=e.fuel_type,
+                        price=e.price,
+                        registered_at=None,
+                    )
+                    for e in estimates_by_station.get(sid, [])
+                ],
+            )
+            for sid in station_ids
+        ]
+    )
+
+
 @stations_router.get("/{station_id}/history")
 async def get_price_history(
     station_id: UUID,
