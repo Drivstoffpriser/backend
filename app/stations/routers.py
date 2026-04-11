@@ -290,6 +290,28 @@ async def search_stations(
     )
 
 
+@stations_router.get("/all")
+async def get_all_stations(
+    db: Annotated[DBSession, Depends(get_db_session)],
+    _: Annotated[User, Depends(get_current_user)],
+) -> SearchStationsResponseBody:
+    stations = await db.fetch_all(sa.select(Station))
+    return SearchStationsResponseBody(
+        stations=[
+            StationBaseSchema(
+                id=s.id,
+                external_id=s.external_id,
+                name=s.name,
+                provider=s.provider,
+                address=s.address,
+                city=s.city,
+                location=LocationSchema.from_wkb(s.location),
+            )
+            for s in stations
+        ]
+    )
+
+
 PRICE_MIN = Decimal("10")
 PRICE_MAX = Decimal("40")
 
