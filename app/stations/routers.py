@@ -330,6 +330,20 @@ class GetPriceHistoryResponseBody(CamelCaseModel):
     recent_updates: list[RecentUpdateSchema]
 
 
+class LastUpdatedSchema(CamelCaseModel):
+    last_updated_at: datetime | None
+
+
+@stations_router.get("/last-updated")
+async def get_last_updated(
+    db: Annotated[DBSession, Depends(get_db_session)],
+) -> LastUpdatedSchema:
+    last_updated_at = await db.fetch_one_or_none(
+        sa.select(sa.func.max(Station.updated_at))
+    )
+    return LastUpdatedSchema(last_updated_at=last_updated_at)
+
+
 @stations_router.get("/{station_id}/history")
 async def get_price_history(
     station_id: UUID,

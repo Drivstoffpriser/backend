@@ -139,6 +139,74 @@ async def test_existing_station_is_updated(db: DBSession) -> None:
     assert station.city == "Stavanger"
 
 
+async def _fetch_updated_at(db: DBSession, external_id: str) -> Any:
+    return await db.fetch_one(
+        sa.select(Station.updated_at).where(Station.external_id == external_id)
+    )
+
+
+async def test_updated_at_unchanged_when_no_fields_change(db: DBSession) -> None:
+    docs = [
+        {
+            "id": "node/10",
+            "name": "Stable Station",
+            "brand": "Circle K",
+            "longitude": 10.0,
+            "latitude": 60.0,
+            "address": "Same Street",
+            "city": "Oslo",
+        }
+    ]
+    with _patch_firestore(docs):
+        await sync_stations_from_firestore()
+
+    updated_at_before = await _fetch_updated_at(db, "node/10")
+
+    with _patch_firestore(docs):
+        await sync_stations_from_firestore()
+
+    updated_at_after = await _fetch_updated_at(db, "node/10")
+    assert updated_at_after == updated_at_before
+
+
+@pytest.mark.parametrize(
+    "changed_field,changed_value",
+    [
+        ("name", "Renamed Station"),
+        ("brand", "Circle K"),
+        ("address", "New Street 99"),
+        ("city", "Bergen"),
+        ("longitude", 10.5),
+        ("latitude", 60.5),
+    ],
+)
+async def test_updated_at_refreshed_when_fields_change(
+    db: DBSession, changed_field: str, changed_value: Any
+) -> None:
+    docs = [
+        {
+            "id": "node/11",
+            "name": "Changing Station",
+            "brand": "YX",
+            "longitude": 10.0,
+            "latitude": 60.0,
+            "address": "Old Street 1",
+            "city": "Oslo",
+        }
+    ]
+    with _patch_firestore(docs):
+        await sync_stations_from_firestore()
+
+    updated_at_before = await _fetch_updated_at(db, "node/11")
+
+    docs[0][changed_field] = changed_value
+    with _patch_firestore(docs):
+        await sync_stations_from_firestore()
+
+    updated_at_after = await _fetch_updated_at(db, "node/11")
+    assert updated_at_after > updated_at_before
+
+
 async def test_optional_fields_default_to_empty_string(db: DBSession) -> None:
     docs = [
         {
