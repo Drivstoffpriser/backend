@@ -359,6 +359,7 @@ class LastUpdatedSchema(CamelCaseModel):
 @stations_router.get("/last-updated")
 async def get_last_updated(
     db: Annotated[DBSession, Depends(get_db_session)],
+    _: Annotated[User, Depends(get_current_user)],
 ) -> LastUpdatedSchema:
     last_updated_at = await db.fetch_one_or_none(
         sa.select(sa.func.max(Station.updated_at))

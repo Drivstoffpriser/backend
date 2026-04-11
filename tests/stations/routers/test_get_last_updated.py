@@ -1,20 +1,23 @@
 from datetime import datetime
 
 from app.core.db import DBSession
+from app.users.models import User
 from tests.conftest import AuthenticatedClient
 from tests.stations.factories import station_factory
 
 
 async def test_get_last_updated_returns_null_when_no_stations(
-    client: AuthenticatedClient,
+    client: AuthenticatedClient, unverified_user: User
 ) -> None:
-    response = await client.get("/stations/last-updated")
+    response = await client.get(
+        "/stations/last-updated", authenticate_with=unverified_user
+    )
     assert response.status_code == 200
     assert response.json()["lastUpdatedAt"] is None
 
 
 async def test_get_last_updated_returns_latest_updated_at(
-    client: AuthenticatedClient, db: DBSession
+    client: AuthenticatedClient, db: DBSession, unverified_user: User
 ) -> None:
     s1 = await station_factory(
         db, external_id="node/1", name="Station 1", lat=59.911, lng=10.752
@@ -23,7 +26,9 @@ async def test_get_last_updated_returns_latest_updated_at(
         db, external_id="node/2", name="Station 2", lat=59.920, lng=10.760
     )
 
-    response = await client.get("/stations/last-updated")
+    response = await client.get(
+        "/stations/last-updated", authenticate_with=unverified_user
+    )
     assert response.status_code == 200
 
     last_updated_at = response.json()["lastUpdatedAt"]
@@ -31,3 +36,8 @@ async def test_get_last_updated_returns_latest_updated_at(
 
     later = max(s1.updated_at, s2.updated_at)
     assert datetime.fromisoformat(last_updated_at) == later
+
+
+async def test_get_last_updated_requires_auth(client: AuthenticatedClient) -> None:
+    response = await client.get("/stations/last-updated")
+    assert response.status_code == 401
