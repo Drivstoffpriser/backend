@@ -516,3 +516,59 @@ async def test_sort_latest_puts_stations_without_prices_last(
     assert response.status_code == 200
     stations = response.json()["stations"]
     assert [s["externalId"] for s in stations] == ["node/priced", "node/no-prices"]
+
+
+async def test_sort_latest_with_fuel_type_ignores_other_fuel_types(
+    client: AuthenticatedClient, db: DBSession, unverified_user: User
+) -> None:
+    s_diesel_old = await station_factory(
+        db, external_id="node/diesel-old", lat=59.911, lng=10.752
+    )
+    s_gasoline_new = await station_factory(
+        db, external_id="node/gasoline-new", lat=59.912, lng=10.752
+    )
+
+    # s_diesel_old has a newer diesel price
+    await price_update_factory(
+        db,
+        station_id=s_diesel_old.id,
+        fuel_type=FuelType.DIESEL,
+        price=Decimal("20.00"),
+        registered_at=datetime(2026, 1, 2, 12, 0, tzinfo=UTC),
+    )
+    # s_gasoline_new has an older diesel price but a newer gasoline price
+    await price_update_factory(
+        db,
+        station_id=s_gasoline_new.id,
+        fuel_type=FuelType.DIESEL,
+        price=Decimal("20.00"),
+        registered_at=datetime(2026, 1, 1, 12, 0, tzinfo=UTC),
+    )
+    await price_update_factory(
+        db,
+        station_id=s_gasoline_new.id,
+        fuel_type=FuelType.GASOLINE_95,
+        price=Decimal("21.00"),
+        registered_at=datetime(2026, 1, 3, 12, 0, tzinfo=UTC),
+    )
+
+    response = await client.get(
+        "/stations",
+        params={
+            "lat": USER_LAT,
+            "lng": USER_LNG,
+            "distance": 10_000,
+            "sort": "latest",
+            "fuelType": "DIESEL",
+        },
+        authenticate_with=unverified_user,
+    )
+
+    assert response.status_code == 200
+    stations = response.json()["stations"]
+    # diesel-old has the most recent DIESEL price,
+    # gasoline-new's newer price is for a different fuel type
+    assert [s["externalId"] for s in stations] == [
+        "node/diesel-old",
+        "node/gasoline-new",
+    ]
