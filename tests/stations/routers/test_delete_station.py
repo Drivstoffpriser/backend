@@ -76,4 +76,4 @@ async def test_delete_station_rejects_unauthenticated(
 
     response = await client.delete(f"/stations/{station.id}")
 
-    assert response.status_code == 403
+    assert response.status_code == 401
