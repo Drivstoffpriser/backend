@@ -3,17 +3,19 @@ from collections import defaultdict
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import Annotated, NamedTuple
+from typing import Annotated, Any, NamedTuple
 from uuid import UUID
 
 import sqlalchemy as sa
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi_limiter.depends import RateLimiter
 from geoalchemy2 import Geometry
+from geoalchemy2.shape import from_shape
 from pydantic import Field, field_validator
 from pyrate_limiter import Duration, Limiter, Rate
+from shapely.geometry import Point  # type: ignore[import-untyped]
 
-from app.core.auth import get_current_user, get_logged_in_user
+from app.core.auth import get_admin_user, get_current_user, get_logged_in_user
 from app.core.db import DBSession, get_db_session
 from app.core.schemas import CamelCaseModel, LocationSchema
 from app.stations.enums import FuelType, ProviderType
@@ -484,4 +486,84 @@ async def register_prices(
                 }
             )
         )
+    await db.commit()
+
+
+class UpdateStationRequestBody(CamelCaseModel):
+    name: str | None = None
+    provider: ProviderType | None = None
+    address: str | None = None
+    city: str | None = None
+    location: LocationSchema | None = None
+
+
+@stations_router.patch("/{station_id}", status_code=200)
+async def update_station(
+    station_id: UUID,
+    body: UpdateStationRequestBody,
+    db: Annotated[DBSession, Depends(get_db_session)],
+    _: Annotated[User, Depends(get_admin_user)],
+) -> StationBaseSchema:
+    station = await db.fetch_one_or_none(
+        sa.select(Station).where(Station.id == station_id)
+    )
+    if station is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Station not found"
+        )
+
+    values: dict[sa.orm.InstrumentedAttribute[Any], Any] = {
+        Station.updated_at: sa.func.now(),
+    }
+    if body.name is not None:
+        values[Station.name] = body.name
+    if body.provider is not None:
+        values[Station.provider] = body.provider
+    if body.address is not None:
+        values[Station.address] = body.address
+    if body.city is not None:
+        values[Station.city] = body.city
+    if body.location is not None:
+        values[Station.location] = from_shape(
+            Point(body.location.lng, body.location.lat), srid=4326
+        )
+
+    result = await db.execute(
+        sa.update(Station)
+        .where(Station.id == station_id)
+        .values(values)
+        .returning(Station)
+    )
+    updated = result.scalars().one()
+    await db.commit()
+
+    return StationBaseSchema(
+        id=updated.id,
+        external_id=updated.external_id,
+        name=updated.name,
+        provider=updated.provider,
+        address=updated.address,
+        city=updated.city,
+        location=LocationSchema.from_wkb(updated.location),
+    )
+
+
+@stations_router.delete("/{station_id}", status_code=204)
+async def delete_station(
+    station_id: UUID,
+    db: Annotated[DBSession, Depends(get_db_session)],
+    _: Annotated[User, Depends(get_admin_user)],
+) -> None:
+    station = await db.fetch_one_or_none(
+        sa.select(Station).where(Station.id == station_id)
+    )
+    if station is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Station not found"
+        )
+
+    await db.execute(
+        sa.delete(PriceRegistration).where(PriceRegistration.station_id == station_id)
+    )
+    await db.execute(sa.delete(Station).where(Station.id == station_id))
     await db.commit()
