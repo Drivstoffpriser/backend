@@ -115,7 +115,7 @@ async def test_inserts_when_same_price_but_newer(db: DBSession) -> None:
     assert latest.source_type == PriceRegistrationSourceType.FIRESTORE
 
 
-async def test_skips_when_same_price_and_not_newer(db: DBSession) -> None:
+async def test_inserts_older_price_as_not_latest(db: DBSession) -> None:
     station = await station_factory(db, external_id="osm_444")
     await price_update_factory(
         db,
@@ -144,7 +144,47 @@ async def test_skips_when_same_price_and_not_newer(db: DBSession) -> None:
             PriceRegistration.station_id == station.id,
         )
     )
-    assert len(rows) == 1
+    assert len(rows) == 2
+    latest = [r for r in rows if r.is_latest]
+    assert len(latest) == 1
+    assert latest[0].price == Decimal("20.00")
+    assert latest[0].source_type != PriceRegistrationSourceType.FIRESTORE
+
+
+async def test_inserts_older_different_price_as_not_latest(db: DBSession) -> None:
+    station = await station_factory(db, external_id="osm_445")
+    await price_update_factory(
+        db,
+        station_id=station.id,
+        fuel_type=FuelType.DIESEL,
+        price=Decimal("20.00"),
+        registered_at=datetime(2026, 6, 1, tzinfo=UTC),
+    )
+
+    with patch.object(
+        sync_module,
+        fetch_all_prices_sync.__name__,
+        return_value=[
+            {
+                "stationId": "osm_445",
+                "fuelType": "diesel",
+                "price": 18.50,
+                "updatedAt": OLDER,
+            }
+        ],
+    ):
+        await _sync_prices(db)
+
+    rows = await db.fetch_all(
+        sa.select(PriceRegistration).where(
+            PriceRegistration.station_id == station.id,
+        )
+    )
+    assert len(rows) == 2
+    latest = [r for r in rows if r.is_latest]
+    assert len(latest) == 1
+    assert latest[0].price == Decimal("20.00")
+    assert latest[0].source_type != PriceRegistrationSourceType.FIRESTORE
 
 
 async def test_skips_unknown_station(db: DBSession) -> None:
