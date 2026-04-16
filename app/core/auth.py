@@ -56,11 +56,13 @@ async def get_current_user(
     email: str | None = decoded.get("email")
     display_name: str | None = decoded.get("name")
     email_verified: bool = decoded.get("email_verified", False)
+    is_admin: bool = decoded.get("admin", False)
 
     insert_values: dict[sqlalchemy.orm.InstrumentedAttribute[Any], Any] = {
         User.firebase_uid: uid,
         User.email: email,
         User.display_name: display_name,
+        User.is_admin: is_admin,
     }
     if email_verified:
         insert_values[User.verified_at] = sa.func.now()
@@ -73,6 +75,7 @@ async def get_current_user(
             set_={
                 User.email: email,
                 User.display_name: display_name,
+                User.is_admin: is_admin,
             },
         )
         .returning(User)
