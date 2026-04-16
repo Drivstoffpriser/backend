@@ -573,8 +573,5 @@ async def delete_station(
             status_code=status.HTTP_404_NOT_FOUND, detail="Station not found"
         )
 
-    await db.execute(
-        sa.delete(PriceRegistration).where(PriceRegistration.station_id == station_id)
-    )
     await db.execute(sa.delete(Station).where(Station.id == station_id))
     await db.commit()
