@@ -512,9 +512,7 @@ async def update_station(
             status_code=status.HTTP_404_NOT_FOUND, detail="Station not found"
         )
 
-    values: dict[sa.orm.InstrumentedAttribute[Any], Any] = {
-        Station.updated_at: sa.func.now(),
-    }
+    values: dict[sa.orm.InstrumentedAttribute[Any], Any] = {}
     if body.name is not None:
         values[Station.name] = body.name
     if body.provider is not None:
@@ -527,6 +525,19 @@ async def update_station(
         values[Station.location] = from_shape(
             Point(body.location.lng, body.location.lat), srid=4326
         )
+
+    if not values:
+        return StationBaseSchema(
+            id=station.id,
+            external_id=station.external_id,
+            name=station.name,
+            provider=station.provider,
+            address=station.address,
+            city=station.city,
+            location=LocationSchema.from_wkb(station.location),
+        )
+
+    values[Station.updated_at] = sa.func.now()
 
     result = await db.execute(
         sa.update(Station)
