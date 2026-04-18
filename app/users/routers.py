@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 from typing import Annotated
 from uuid import UUID
 
@@ -50,14 +51,15 @@ async def delete_current_user(
     current_user: Annotated[User, Depends(get_authenticated_user)],
     db: Annotated[DBSession, Depends(get_db_session)],
 ) -> None:
-    # Delete the user from the database and then delete the user from Firebase Auth
-    await db.execute(sa.delete(User).where(User.id == current_user.id))
-    await asyncio.to_thread(
-        firebase_admin.auth.delete_user,
-        current_user.firebase_uid,
-        app=get_firebase_app(),
-    )
+    # Delete user from Firebase. If not found, delete user from our db
+    with contextlib.suppress(firebase_admin.auth.UserNotFoundError):
+        await asyncio.to_thread(
+            firebase_admin.auth.delete_user,
+            current_user.firebase_uid,
+            app=get_firebase_app(),
+        )
 
+    await db.execute(sa.delete(User).where(User.id == current_user.id))
     await db.commit()
 
 

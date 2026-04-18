@@ -75,7 +75,23 @@ async def test_delete_current_user_nullifies_price_registrations(
     assert result.scalar_one() is None
 
 
-async def test_delete_current_user_does_not_delete_if_firebase_fails(
+async def test_delete_current_user_deletes_if_not_found_in_firebase(
+    client: AuthenticatedClient,
+    db: DBSession,
+    mock_firebase_delete: MagicMock,
+) -> None:
+    user = await user_factory(db=db)
+    mock_firebase_delete.side_effect = firebase_admin.auth.UserNotFoundError(
+        "not found"
+    )
+
+    response = await client.delete("/users/me", authenticate_with=user)
+
+    assert response.status_code == 204
+    assert await db.fetch_one_or_none(sa.select(User).where(User.id == user.id)) is None
+
+
+async def test_delete_current_user_aborts_on_firebase_error(
     client: AuthenticatedClient,
     db: DBSession,
     mock_firebase_delete: MagicMock,
@@ -83,11 +99,10 @@ async def test_delete_current_user_does_not_delete_if_firebase_fails(
     user = await user_factory(db=db)
     mock_firebase_delete.side_effect = Exception("Firebase error")
 
-    # No rollback in tests — verify commit was never called so DELETE was not persisted.
-    with (
-        patch.object(db, "commit") as mock_commit,
-        pytest.raises(Exception, match="Firebase error"),
-    ):
+    with pytest.raises(Exception, match="Firebase error"):
         await client.delete("/users/me", authenticate_with=user)
 
-    mock_commit.assert_not_called()
+    assert (
+        await db.fetch_one_or_none(sa.select(User).where(User.id == user.id))
+        is not None
+    )
