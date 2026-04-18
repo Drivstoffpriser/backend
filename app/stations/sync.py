@@ -180,24 +180,19 @@ async def _sync_prices(session: DBSession) -> None:  # noqa: C901
                 registered_at = datetime.now(UTC)
 
             current = current_prices.get((station_id, fuel_type))
-            if current is not None:
-                current_price, current_registered_at = current
-                if (
-                    current_price == incoming_price
-                    and current_registered_at >= registered_at
-                ):
-                    skipped += 1
-                    continue
+            is_latest = current is None or registered_at > current[1]
 
-            await session.execute(
-                sa.update(PriceRegistration)
-                .where(
-                    PriceRegistration.station_id == station_id,
-                    PriceRegistration.fuel_type == fuel_type,
-                    PriceRegistration.is_latest.is_(True),
+            if is_latest:
+                await session.execute(
+                    sa.update(PriceRegistration)
+                    .where(
+                        PriceRegistration.station_id == station_id,
+                        PriceRegistration.fuel_type == fuel_type,
+                        PriceRegistration.is_latest.is_(True),
+                    )
+                    .values({PriceRegistration.is_latest: False})
                 )
-                .values({PriceRegistration.is_latest: False})
-            )
+
             await session.execute(
                 sa.insert(PriceRegistration).values(
                     {
@@ -209,11 +204,15 @@ async def _sync_prices(session: DBSession) -> None:  # noqa: C901
                         ),
                         PriceRegistration.registered_by: None,
                         PriceRegistration.registered_at: registered_at,
-                        PriceRegistration.is_latest: True,
+                        PriceRegistration.is_latest: is_latest,
                     }
                 )
             )
-            current_prices[(station_id, fuel_type)] = (incoming_price, registered_at)
+            if is_latest:
+                current_prices[(station_id, fuel_type)] = (
+                    incoming_price,
+                    registered_at,
+                )
             updated += 1
 
         await session.commit()
