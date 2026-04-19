@@ -7,7 +7,6 @@ import sqlalchemy as sa
 from apscheduler.schedulers.asyncio import (  # type: ignore[import-untyped]
     AsyncIOScheduler,
 )
-from apscheduler.triggers.cron import CronTrigger  # type: ignore[import-untyped]
 from apscheduler.triggers.interval import (  # type: ignore[import-untyped]
     IntervalTrigger,
 )
@@ -19,7 +18,7 @@ from app.core.db import DBSession, get_db_session
 from app.core.logging import logger
 from app.favorite_stations.routers import favorite_stations_router
 from app.stations.routers import stations_router
-from app.stations.sync import sync_prices_from_firestore, sync_stations_from_firestore
+from app.stations.sync import sync_prices_from_firestore
 from app.tools.routers import tools_router
 from app.users.routers import users_router
 
@@ -27,12 +26,6 @@ from app.users.routers import users_router
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     scheduler = AsyncIOScheduler()
-    scheduler.add_job(
-        sync_stations_from_firestore,
-        CronTrigger(hour=3, minute=0, timezone="Europe/Oslo"),
-        id="sync_stations",
-        replace_existing=True,
-    )
     scheduler.add_job(
         sync_prices_from_firestore,
         IntervalTrigger(minutes=10),
