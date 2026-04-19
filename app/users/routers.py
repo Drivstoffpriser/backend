@@ -5,12 +5,12 @@ from uuid import UUID
 
 import firebase_admin.auth  # type: ignore[import-untyped]
 import sqlalchemy as sa
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi_limiter.depends import RateLimiter
 from pyrate_limiter import Duration, Limiter, Rate
 
+from app.core.auth import get_admin_user, get_firebase_app
 from app.core.auth import get_current_user as get_authenticated_user
-from app.core.auth import get_firebase_app
 from app.core.db import DBSession, get_db_session
 from app.core.schemas import CamelCaseModel
 from app.stations.models import PriceRegistration
@@ -78,3 +78,66 @@ async def get_user_price_registrations(
         )
     )
     return GetUserPriceRegistrationsResponseBody(total=total)
+
+
+async def _set_admin_claim(firebase_uid: str, is_admin: bool) -> None:
+    try:
+        await asyncio.to_thread(
+            firebase_admin.auth.set_custom_user_claims,
+            firebase_uid,
+            {"admin": is_admin},
+            app=get_firebase_app(),
+        )
+    except firebase_admin.auth.UserNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found in Firebase",
+        ) from e
+
+
+async def _update_admin(
+    firebase_uid: str,
+    is_admin: bool,
+    db: DBSession,
+    current_user: User,
+) -> None:
+    if firebase_uid == current_user.firebase_uid and not is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot demote yourself",
+        )
+
+    user = await db.fetch_one_or_none(
+        sa.select(User).where(User.firebase_uid == firebase_uid)
+    )
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+
+    await _set_admin_claim(firebase_uid, is_admin)
+
+    await db.execute(
+        sa.update(User)
+        .where(User.firebase_uid == firebase_uid)
+        .values({User.is_admin: is_admin})
+    )
+    await db.commit()
+
+
+@users_router.post("/{firebase_uid}/admin", status_code=204)
+async def promote_admin(
+    firebase_uid: str,
+    db: Annotated[DBSession, Depends(get_db_session)],
+    current_user: Annotated[User, Depends(get_admin_user)],
+) -> None:
+    await _update_admin(firebase_uid, True, db, current_user)
+
+
+@users_router.delete("/{firebase_uid}/admin", status_code=204)
+async def demote_admin(
+    firebase_uid: str,
+    db: Annotated[DBSession, Depends(get_db_session)],
+    current_user: Annotated[User, Depends(get_admin_user)],
+) -> None:
+    await _update_admin(firebase_uid, False, db, current_user)
