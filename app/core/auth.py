@@ -56,11 +56,13 @@ async def get_current_user(
     email: str | None = decoded.get("email")
     display_name: str | None = decoded.get("name")
     email_verified: bool = decoded.get("email_verified", False)
+    is_admin: bool = decoded.get("admin", False)
 
     insert_values: dict[sqlalchemy.orm.InstrumentedAttribute[Any], Any] = {
         User.firebase_uid: uid,
         User.email: email,
         User.display_name: display_name,
+        User.is_admin: is_admin,
     }
     if email_verified:
         insert_values[User.verified_at] = sa.func.now()
@@ -73,6 +75,7 @@ async def get_current_user(
             set_={
                 User.email: email,
                 User.display_name: display_name,
+                User.is_admin: is_admin,
             },
         )
         .returning(User)
@@ -110,6 +113,17 @@ async def get_verified_user(
     if user.verified_at is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Email not verified"
+        )
+
+    return user
+
+
+async def get_admin_user(
+    user: Annotated[User, Depends(get_current_user)],
+) -> User:
+    if not user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required"
         )
 
     return user
