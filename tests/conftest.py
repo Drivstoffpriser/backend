@@ -19,7 +19,11 @@ from app.core.db import (
 )
 from app.main import app
 from app.users.models import User
-from tests.users.factories import user_factory, verified_user_factory
+from tests.users.factories import (
+    admin_user_factory,
+    user_factory,
+    verified_user_factory,
+)
 
 import_all_models()
 
@@ -143,3 +147,8 @@ async def unverified_user(db: DBSession) -> User:
 @pytest.fixture
 async def verified_user(db: DBSession) -> User:
     return await verified_user_factory(db=db)
+
+
+@pytest.fixture
+async def admin_user(db: DBSession) -> User:
+    return await admin_user_factory(db=db)

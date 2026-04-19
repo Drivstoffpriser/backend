@@ -51,7 +51,9 @@ class PriceRegistration(Base):
         ),
     )
 
-    station_id: Mapped[UUID] = mapped_column(ForeignKey("station.id"))
+    station_id: Mapped[UUID] = mapped_column(
+        ForeignKey("station.id", ondelete="CASCADE")
+    )
     registered_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=sa.func.now()
     )
