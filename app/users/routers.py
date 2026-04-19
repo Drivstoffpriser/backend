@@ -96,48 +96,68 @@ async def _set_admin_claim(firebase_uid: str, is_admin: bool) -> None:
 
 
 async def _update_admin(
-    firebase_uid: str,
+    user_id: UUID,
     is_admin: bool,
     db: DBSession,
-    current_user: User,
 ) -> None:
-    if firebase_uid == current_user.firebase_uid and not is_admin:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot demote yourself",
-        )
-
-    user = await db.fetch_one_or_none(
-        sa.select(User).where(User.firebase_uid == firebase_uid)
-    )
+    user = await db.fetch_one_or_none(sa.select(User).where(User.id == user_id))
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
 
-    await _set_admin_claim(firebase_uid, is_admin)
+    await _set_admin_claim(user.firebase_uid, is_admin)
 
     await db.execute(
-        sa.update(User)
-        .where(User.firebase_uid == firebase_uid)
-        .values({User.is_admin: is_admin})
+        sa.update(User).where(User.id == user_id).values({User.is_admin: is_admin})
     )
     await db.commit()
 
 
-@users_router.post("/{firebase_uid}/admin", status_code=204)
+class UserLookupResponseBody(CamelCaseModel):
+    id: UUID
+    email: str | None
+    display_name: str | None
+    is_admin: bool
+
+
+@users_router.get("/by-email")
+async def get_user_by_email(
+    email: str,
+    db: Annotated[DBSession, Depends(get_db_session)],
+    _: Annotated[User, Depends(get_admin_user)],
+) -> UserLookupResponseBody:
+    user = await db.fetch_one_or_none(sa.select(User).where(User.email == email))
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+    return UserLookupResponseBody(
+        id=user.id,
+        email=user.email,
+        display_name=user.display_name,
+        is_admin=user.is_admin,
+    )
+
+
+@users_router.post("/{user_id}/admin", status_code=204)
 async def promote_admin(
-    firebase_uid: str,
+    user_id: UUID,
     db: Annotated[DBSession, Depends(get_db_session)],
-    current_user: Annotated[User, Depends(get_admin_user)],
+    _: Annotated[User, Depends(get_admin_user)],
 ) -> None:
-    await _update_admin(firebase_uid, True, db, current_user)
+    await _update_admin(user_id, True, db)
 
 
-@users_router.delete("/{firebase_uid}/admin", status_code=204)
+@users_router.delete("/{user_id}/admin", status_code=204)
 async def demote_admin(
-    firebase_uid: str,
+    user_id: UUID,
     db: Annotated[DBSession, Depends(get_db_session)],
     current_user: Annotated[User, Depends(get_admin_user)],
 ) -> None:
-    await _update_admin(firebase_uid, False, db, current_user)
+    if user_id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot demote yourself",
+        )
+    await _update_admin(user_id, False, db)

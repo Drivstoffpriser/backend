@@ -1,5 +1,6 @@
 from collections.abc import Generator
 from unittest.mock import MagicMock, patch
+from uuid import uuid4
 
 import firebase_admin.auth  # type: ignore[import-untyped]
 import pytest
@@ -28,7 +29,7 @@ async def test_promote_sets_claim_and_db_flag(
     )
 
     response = await client.post(
-        f"/users/{target.firebase_uid}/admin", authenticate_with=admin_user
+        f"/users/{target.id}/admin", authenticate_with=admin_user
     )
 
     assert response.status_code == 204
@@ -56,7 +57,7 @@ async def test_demote_clears_claim_and_db_flag(
     await db.commit()
 
     response = await client.delete(
-        f"/users/{target.firebase_uid}/admin", authenticate_with=admin_user
+        f"/users/{target.id}/admin", authenticate_with=admin_user
     )
 
     assert response.status_code == 204
@@ -78,7 +79,7 @@ async def test_promote_rejects_non_admin(
     )
 
     response = await client.post(
-        f"/users/{target.firebase_uid}/admin", authenticate_with=verified_user
+        f"/users/{target.id}/admin", authenticate_with=verified_user
     )
 
     assert response.status_code == 403
@@ -92,19 +93,19 @@ async def test_promote_rejects_unauthenticated(
         db=db, firebase_uid="target-uid", email="target@example.com"
     )
 
-    response = await client.post(f"/users/{target.firebase_uid}/admin")
+    response = await client.post(f"/users/{target.id}/admin")
 
     assert response.status_code == 401
     mock_set_claims.assert_not_called()
 
 
-async def test_promote_returns_404_for_unknown_uid(
+async def test_promote_returns_404_for_unknown_id(
     client: AuthenticatedClient,
     admin_user: User,
     mock_set_claims: MagicMock,
 ) -> None:
     response = await client.post(
-        "/users/does-not-exist/admin", authenticate_with=admin_user
+        f"/users/{uuid4()}/admin", authenticate_with=admin_user
     )
 
     assert response.status_code == 404
@@ -123,7 +124,7 @@ async def test_promote_returns_404_when_firebase_user_missing(
     mock_set_claims.side_effect = firebase_admin.auth.UserNotFoundError("not found")
 
     response = await client.post(
-        f"/users/{target.firebase_uid}/admin", authenticate_with=admin_user
+        f"/users/{target.id}/admin", authenticate_with=admin_user
     )
 
     assert response.status_code == 404
@@ -137,8 +138,55 @@ async def test_demote_rejects_self(
     mock_set_claims: MagicMock,
 ) -> None:
     response = await client.delete(
-        f"/users/{admin_user.firebase_uid}/admin", authenticate_with=admin_user
+        f"/users/{admin_user.id}/admin", authenticate_with=admin_user
     )
 
     assert response.status_code == 400
     mock_set_claims.assert_not_called()
+
+
+async def test_get_user_by_email_returns_user(
+    client: AuthenticatedClient, db: DBSession, admin_user: User
+) -> None:
+    target = await verified_user_factory(
+        db=db, firebase_uid="target-uid", email="target@example.com"
+    )
+
+    response = await client.get(
+        "/users/by-email",
+        params={"email": target.email},
+        authenticate_with=admin_user,
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == str(target.id)
+    assert data["email"] == "target@example.com"
+
+
+async def test_get_user_by_email_rejects_non_admin(
+    client: AuthenticatedClient, db: DBSession, verified_user: User
+) -> None:
+    target = await verified_user_factory(
+        db=db, firebase_uid="target-uid", email="target@example.com"
+    )
+
+    response = await client.get(
+        "/users/by-email",
+        params={"email": target.email},
+        authenticate_with=verified_user,
+    )
+
+    assert response.status_code == 403
+
+
+async def test_get_user_by_email_returns_404_for_unknown_email(
+    client: AuthenticatedClient, admin_user: User
+) -> None:
+    response = await client.get(
+        "/users/by-email",
+        params={"email": "nobody@example.com"},
+        authenticate_with=admin_user,
+    )
+
+    assert response.status_code == 404
