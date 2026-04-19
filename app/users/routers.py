@@ -96,6 +96,7 @@ async def _set_admin_claim(firebase_uid: str, is_admin: bool) -> None:
 
 
 async def _update_admin(
+    *,
     user_id: UUID,
     is_admin: bool,
     db: DBSession,
@@ -146,7 +147,7 @@ async def promote_admin(
     db: Annotated[DBSession, Depends(get_db_session)],
     _: Annotated[User, Depends(get_admin_user)],
 ) -> None:
-    await _update_admin(user_id, True, db)
+    await _update_admin(user_id=user_id, is_admin=True, db=db)
 
 
 @users_router.delete("/{user_id}/admin", status_code=204)
@@ -160,4 +161,4 @@ async def demote_admin(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot demote yourself",
         )
-    await _update_admin(user_id, False, db)
+    await _update_admin(user_id=user_id, is_admin=False, db=db)
