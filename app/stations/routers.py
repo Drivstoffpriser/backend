@@ -575,3 +575,45 @@ async def delete_station(
 
     await db.execute(sa.delete(Station).where(Station.id == station_id))
     await db.commit()
+
+
+@stations_router.delete("/{station_id}/prices/{price_id}", status_code=204)
+async def delete_price_registration(
+    station_id: UUID,
+    price_id: UUID,
+    db: Annotated[DBSession, Depends(get_db_session)],
+    _: Annotated[User, Depends(get_admin_user)],
+) -> None:
+    registration = await db.fetch_one_or_none(
+        sa.select(PriceRegistration).where(
+            PriceRegistration.id == price_id,
+            PriceRegistration.station_id == station_id,
+        )
+    )
+    if registration is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Price registration not found"
+        )
+
+    await db.execute(
+        sa.delete(PriceRegistration).where(PriceRegistration.id == price_id)
+    )
+
+    if registration.is_latest:
+        next_latest = await db.fetch_one_or_none(
+            sa.select(PriceRegistration)
+            .where(
+                PriceRegistration.station_id == station_id,
+                PriceRegistration.fuel_type == registration.fuel_type,
+            )
+            .order_by(PriceRegistration.registered_at.desc())
+            .limit(1)
+        )
+        if next_latest is not None:
+            await db.execute(
+                sa.update(PriceRegistration)
+                .where(PriceRegistration.id == next_latest.id)
+                .values({PriceRegistration.is_latest: True})
+            )
+
+    await db.commit()
