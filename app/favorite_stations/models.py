@@ -14,5 +14,7 @@ class FavoriteStation(Base):
         ),
     )
 
-    user_id: Mapped[UUID] = mapped_column(sa.ForeignKey("user.id"))
-    station_id: Mapped[UUID] = mapped_column(sa.ForeignKey("station.id"))
+    user_id: Mapped[UUID] = mapped_column(sa.ForeignKey("user.id", ondelete="CASCADE"))
+    station_id: Mapped[UUID] = mapped_column(
+        sa.ForeignKey("station.id", ondelete="CASCADE")
+    )
