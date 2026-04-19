@@ -43,6 +43,7 @@ known-first-party = ["app"]
 python_version = "3.14"
 strict = true
 plugins = ["pydantic.mypy"]
+exclude = ["alembic/versions"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

@@ -65,5 +65,8 @@ class PriceRegistration(Base):
         sa.Enum(PriceRegistrationSourceType, length=50, native_enum=False),
         server_default=PriceRegistrationSourceType.USER,
     )
-    registered_by: Mapped[UUID | None] = mapped_column(ForeignKey("user.id"))
+    # Set to null if user deletes their account, or if imported from an external source
+    registered_by: Mapped[UUID | None] = mapped_column(
+        ForeignKey("user.id", ondelete="SET NULL")
+    )
     is_latest: Mapped[bool] = mapped_column(sa.Boolean, server_default=sa.text("true"))
