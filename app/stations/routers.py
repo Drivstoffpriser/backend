@@ -9,7 +9,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi_limiter.depends import RateLimiter
-from geoalchemy2 import Geometry
+from geoalchemy2 import Geography, Geometry
 from geoalchemy2.shape import from_shape
 from pydantic import Field, field_validator
 from pyrate_limiter import Duration, Limiter, Rate
@@ -182,7 +182,9 @@ async def get_stations(
             status_code=422, detail="fuelType is required when sort=cheapest"
         )
 
-    user_point = sa.func.ST_GeogFromText(f"POINT({lng} {lat})")
+    user_point = sa.cast(
+        sa.func.ST_SetSRID(sa.func.ST_MakePoint(lng, lat), 4326), Geography
+    )
     base_query = sa.select(Station).where(
         sa.func.ST_DWithin(Station.location, user_point, distance)
     )
@@ -220,12 +222,8 @@ async def get_stations(
 
     stations = await db.fetch_all(query.limit(50))
     prices_by_station = await _fetch_latest_prices(db, [s.id for s in stations])
-    unpriced_station_ids = [s.id for s in stations if s.id not in prices_by_station]
-    estimates_by_station = await _fetch_estimated_prices(db, unpriced_station_ids)
 
-    return GetStationsResponseBody.from_models(
-        stations, prices_by_station, estimates_by_station
-    )
+    return GetStationsResponseBody.from_models(stations, prices_by_station)
 
 
 @stations_router.get("/bbox")
