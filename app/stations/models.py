@@ -19,6 +19,7 @@ class Station(Base):
         sa.Index(
             "uq_station_location", sa.text("ST_AsText(location::geometry)"), unique=True
         ),
+        sa.Index("idx_station_updated_at", sa.text("updated_at DESC")),
     )
 
     external_id: Mapped[str] = mapped_column(String, unique=True)
@@ -49,6 +50,7 @@ class PriceRegistration(Base):
             unique=True,
             postgresql_where=sa.text("is_latest = true"),
         ),
+        sa.Index("idx_price_registration_registered_by", "registered_by"),
     )
 
     station_id: Mapped[UUID] = mapped_column(

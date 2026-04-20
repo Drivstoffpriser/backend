@@ -149,6 +149,7 @@ async def _fetch_estimated_prices(
                 WHERE pr.is_latest = true
                   AND pr.fuel_type = ft.fuel_type
                   AND s2.id != sne.id
+                  AND ST_DWithin(sne.location, s2.location, 100000)
                 ORDER BY ST_Distance(sne.location, s2.location)
                 LIMIT 5
             ) nearby
