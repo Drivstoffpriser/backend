@@ -51,6 +51,14 @@ class PriceRegistration(Base):
             postgresql_where=sa.text("is_latest = true"),
         ),
         sa.Index("idx_price_registration_registered_by", "registered_by"),
+        sa.Index(
+            "idx_price_latest_fuel_price",
+            "fuel_type",
+            "price",
+            unique=False,
+            postgresql_where=sa.text("is_latest = true"),
+            postgresql_include=["station_id"],
+        ),
     )
 
     station_id: Mapped[UUID] = mapped_column(

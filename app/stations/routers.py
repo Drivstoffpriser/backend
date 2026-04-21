@@ -195,17 +195,19 @@ async def get_stations(
                 sa.func.ST_Distance(Station.location, user_point)
             )
         case StationSortType.CHEAPEST:
-            price_subq = (
-                sa.select(PriceRegistration.station_id, PriceRegistration.price)
+            query = (
+                sa.select(Station)
+                .join(
+                    PriceRegistration,
+                    PriceRegistration.station_id == Station.id,
+                )
                 .where(
                     PriceRegistration.is_latest.is_(True),
                     PriceRegistration.fuel_type == fuel_type,
+                    sa.func.ST_DWithin(Station.location, user_point, distance),
                 )
-                .subquery()
+                .order_by(PriceRegistration.price.asc())
             )
-            query = base_query.outerjoin(
-                price_subq, Station.id == price_subq.c.station_id
-            ).order_by(sa.nulls_last(price_subq.c.price.asc()))
         case StationSortType.LATEST:
             latest_q = sa.select(
                 PriceRegistration.station_id,
