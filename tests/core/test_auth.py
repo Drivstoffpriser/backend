@@ -1,34 +1,64 @@
 from collections.abc import Generator
 from datetime import UTC, datetime
-from typing import Any
 from unittest.mock import MagicMock, patch
 
 import firebase_admin.auth  # type: ignore[import-untyped]
 import pytest
+from fastapi import HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
 
 import app.core.auth
-from app.core.auth import get_current_user
+from app.core.auth import _verify_firebase_token, get_current_user
 from app.core.db import DBSession
 from tests.users.factories import user_factory
 
-
-def _make_credentials() -> HTTPAuthorizationCredentials:
-    return HTTPAuthorizationCredentials(scheme="Bearer", credentials="token")
-
-
-def _patch_firebase(decoded: dict[str, Any]) -> Any:
-    return patch.object(
-        firebase_admin.auth,
-        "verify_id_token",
-        return_value=decoded,
-    )
+_CREDENTIALS = HTTPAuthorizationCredentials(scheme="Bearer", credentials="token")
 
 
 @pytest.fixture(autouse=True)
 def patch_firebase_app() -> Generator[None]:
     with patch.object(app.core.auth, "get_firebase_app", return_value=MagicMock()):
         yield
+
+
+async def test_verify_firebase_token_returns_decoded() -> None:
+    decoded = {"uid": "test-uid", "email": "test@example.com"}
+    with patch.object(firebase_admin.auth, "verify_id_token", return_value=decoded):
+        result = await _verify_firebase_token(credentials=_CREDENTIALS)
+
+    assert result == decoded
+
+
+async def test_verify_firebase_token_raises_on_expired_token() -> None:
+    with (
+        patch.object(
+            firebase_admin.auth,
+            "verify_id_token",
+            side_effect=firebase_admin.auth.ExpiredIdTokenError(
+                "expired", cause="expired"
+            ),
+        ),
+        pytest.raises(HTTPException) as exc_info,
+    ):
+        await _verify_firebase_token(credentials=_CREDENTIALS)
+
+    assert exc_info.value.status_code == 401
+    assert exc_info.value.detail == "Token expired"
+
+
+async def test_verify_firebase_token_raises_on_invalid_token() -> None:
+    with (
+        patch.object(
+            firebase_admin.auth,
+            "verify_id_token",
+            side_effect=firebase_admin.auth.InvalidIdTokenError("invalid"),
+        ),
+        pytest.raises(HTTPException) as exc_info,
+    ):
+        await _verify_firebase_token(credentials=_CREDENTIALS)
+
+    assert exc_info.value.status_code == 401
+    assert exc_info.value.detail == "Invalid token"
 
 
 async def test_new_verified_user_is_created(db: DBSession) -> None:
@@ -39,8 +69,7 @@ async def test_new_verified_user_is_created(db: DBSession) -> None:
         "email_verified": True,
     }
 
-    with _patch_firebase(decoded):
-        user = await get_current_user(db=db, credentials=_make_credentials())
+    user = await get_current_user(decoded=decoded, db=db)
 
     assert user.firebase_uid == "new-uid"
     assert user.email == "new@example.com"
@@ -55,8 +84,7 @@ async def test_new_unverified_user_is_created(db: DBSession) -> None:
         "email_verified": False,
     }
 
-    with _patch_firebase(decoded):
-        user = await get_current_user(db=db, credentials=_make_credentials())
+    user = await get_current_user(decoded=decoded, db=db)
 
     assert user.firebase_uid == "new-uid"
     assert user.email == "new@example.com"
@@ -72,8 +100,7 @@ async def test_existing_user_is_returned(db: DBSession) -> None:
         "email_verified": True,
     }
 
-    with _patch_firebase(decoded):
-        user = await get_current_user(db=db, credentials=_make_credentials())
+    user = await get_current_user(decoded=decoded, db=db)
 
     assert user.id == existing.id
 
@@ -92,8 +119,7 @@ async def test_verified_at_set_when_existing_user_has_email_and_no_verified_at(
         "email_verified": True,
     }
 
-    with _patch_firebase(decoded):
-        user = await get_current_user(db=db, credentials=_make_credentials())
+    user = await get_current_user(decoded=decoded, db=db)
 
     assert user.verified_at is not None
 
@@ -113,8 +139,7 @@ async def test_verified_at_not_overwritten_when_already_set(db: DBSession) -> No
         "email_verified": True,
     }
 
-    with _patch_firebase(decoded):
-        user = await get_current_user(db=db, credentials=_make_credentials())
+    user = await get_current_user(decoded=decoded, db=db)
 
     assert user.verified_at == original_ts
 
@@ -133,8 +158,7 @@ async def test_verified_at_not_set_when_email_not_verified(db: DBSession) -> Non
         "email_verified": False,
     }
 
-    with _patch_firebase(decoded):
-        user = await get_current_user(db=db, credentials=_make_credentials())
+    user = await get_current_user(decoded=decoded, db=db)
 
     assert user.id == existing.id
     assert user.verified_at is None
@@ -143,8 +167,7 @@ async def test_verified_at_not_set_when_email_not_verified(db: DBSession) -> Non
 async def test_anonymous_user_has_no_verified_at(db: DBSession) -> None:
     decoded = {"uid": "anon-uid", "provider_id": "anonymous"}
 
-    with _patch_firebase(decoded):
-        user = await get_current_user(db=db, credentials=_make_credentials())
+    user = await get_current_user(decoded=decoded, db=db)
 
     assert user.firebase_uid == "anon-uid"
     assert user.email is None

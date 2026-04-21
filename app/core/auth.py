@@ -33,12 +33,11 @@ def get_firebase_app() -> firebase_admin.App:
     return firebase_admin.initialize_app(cred)
 
 
-async def get_current_user(
-    db: Annotated[DBSession, Depends(get_db_session)],
+async def _verify_firebase_token(
     credentials: Annotated[HTTPAuthorizationCredentials, Depends(_bearer)],
-) -> User:
+) -> dict[str, Any]:
     try:
-        decoded = await asyncio.to_thread(
+        return await asyncio.to_thread(
             firebase_admin.auth.verify_id_token,
             credentials.credentials,
             app=get_firebase_app(),
@@ -52,6 +51,11 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
         ) from e
 
+
+async def get_current_user(
+    decoded: Annotated[dict[str, Any], Depends(_verify_firebase_token)],
+    db: Annotated[DBSession, Depends(get_db_session)],
+) -> User:
     uid: str = decoded["uid"]
     email: str | None = decoded.get("email")
     display_name: str | None = decoded.get("name")
