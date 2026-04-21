@@ -293,25 +293,16 @@ async def test_sort_cheapest_orders_by_price_for_fuel_type(
     ]
 
 
-async def test_sort_cheapest_puts_stations_without_price_last(
+async def test_sort_cheapest_excludes_stations_without_price(
     client: AuthenticatedClient, db: DBSession, unverified_user: User
 ) -> None:
-    s_no_price = await station_factory(
-        db, external_id="node/no-price", lat=59.911, lng=10.752
-    )
+    await station_factory(db, external_id="node/no-price", lat=59.911, lng=10.752)
     s_priced = await station_factory(
         db, external_id="node/priced", lat=59.912, lng=10.752
     )
 
     await price_update_factory(
         db, station_id=s_priced.id, fuel_type=FuelType.DIESEL, price=Decimal("20.00")
-    )
-    # s_no_price has GASOLINE_95 but not DIESEL — should sort last for fuelType=DIESEL
-    await price_update_factory(
-        db,
-        station_id=s_no_price.id,
-        fuel_type=FuelType.GASOLINE_95,
-        price=Decimal("15.00"),
     )
 
     response = await client.get(
@@ -328,7 +319,7 @@ async def test_sort_cheapest_puts_stations_without_price_last(
 
     assert response.status_code == 200
     stations = response.json()["stations"]
-    assert [s["externalId"] for s in stations] == ["node/priced", "node/no-price"]
+    assert [s["externalId"] for s in stations] == ["node/priced"]
 
 
 async def test_sort_cheapest_requires_fuel_type(
