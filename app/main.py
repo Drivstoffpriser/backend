@@ -68,7 +68,7 @@ app.include_router(users_router)
 app.include_router(tools_router)
 
 
-@app.get("/health", status_code=200)
+@app.api_route("/health", methods=["GET", "HEAD"], status_code=200)
 async def health(
     db: Annotated[DBSession, Depends(get_db_session)],
 ) -> dict[str, str]:
