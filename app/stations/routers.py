@@ -8,11 +8,9 @@ from uuid import UUID
 
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi_limiter.depends import RateLimiter
 from geoalchemy2 import Geography, Geometry
 from geoalchemy2.shape import from_shape
 from pydantic import Field, field_validator
-from pyrate_limiter import Duration, Limiter, Rate
 from shapely.geometry import Point  # type: ignore[import-untyped]
 
 from app.core.auth import get_admin_user, get_current_user, get_logged_in_user
@@ -32,9 +30,6 @@ class StationSortType(StrEnum):
 stations_router = APIRouter(
     prefix="/stations",
     tags=["stations"],
-    dependencies=[
-        Depends(RateLimiter(limiter=Limiter(Rate(10, Duration.SECOND * 10))))
-    ],
 )
 
 
