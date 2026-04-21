@@ -190,9 +190,6 @@ async def get_stations(
                 sa.func.ST_Distance(Station.location, user_point)
             )
         case StationSortType.CHEAPEST:
-            nearby_ids = sa.select(Station.id).where(
-                sa.func.ST_DWithin(Station.location, user_point, distance)
-            )
             query = (
                 sa.select(Station)
                 .join(
@@ -200,9 +197,9 @@ async def get_stations(
                     PriceRegistration.station_id == Station.id,
                 )
                 .where(
+                    sa.func.ST_DWithin(Station.location, user_point, distance),
                     PriceRegistration.is_latest.is_(True),
                     PriceRegistration.fuel_type == fuel_type,
-                    PriceRegistration.station_id.in_(nearby_ids),
                 )
                 .order_by(PriceRegistration.price.asc())
             )

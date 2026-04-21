@@ -63,6 +63,7 @@ class Database:
             max_overflow=20,
             pool_timeout=10,
             pool_pre_ping=True,
+            connect_args={"server_settings": {"plan_cache_mode": "force_custom_plan"}},
         )
         self._session_factory = async_sessionmaker(
             self._engine,
