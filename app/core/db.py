@@ -56,7 +56,14 @@ class DBSession:
 class Database:
     def __init__(self) -> None:
         settings = get_settings()
-        self._engine = create_async_engine(settings.database_url, echo=False)
+        self._engine = create_async_engine(
+            settings.database_url,
+            echo=False,
+            pool_size=10,
+            max_overflow=20,
+            pool_timeout=10,
+            pool_pre_ping=True,
+        )
         self._session_factory = async_sessionmaker(
             self._engine,
             class_=AsyncSession,
