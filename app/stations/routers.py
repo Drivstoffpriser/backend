@@ -190,10 +190,8 @@ async def get_stations(
                 sa.func.ST_Distance(Station.location, user_point)
             )
         case StationSortType.CHEAPEST:
-            nearby_subq = (
-                sa.select(Station.id)
-                .where(sa.func.ST_DWithin(Station.location, user_point, distance))
-                .subquery()
+            nearby_ids = sa.select(Station.id).where(
+                sa.func.ST_DWithin(Station.location, user_point, distance)
             )
             query = (
                 sa.select(Station)
@@ -204,7 +202,7 @@ async def get_stations(
                 .where(
                     PriceRegistration.is_latest.is_(True),
                     PriceRegistration.fuel_type == fuel_type,
-                    PriceRegistration.station_id.in_(sa.select(nearby_subq)),
+                    PriceRegistration.station_id.in_(nearby_ids),
                 )
                 .order_by(PriceRegistration.price.asc())
             )
@@ -224,7 +222,6 @@ async def get_stations(
 
     stations = await db.fetch_all(query.limit(50))
     prices_by_station = await _fetch_latest_prices(db, [s.id for s in stations])
-
     return GetStationsResponseBody.from_models(stations, prices_by_station)
 
 
