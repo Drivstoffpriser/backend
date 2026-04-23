@@ -177,7 +177,7 @@ async def get_stations(
     sort: Annotated[StationSortType, Query()] = StationSortType.NEAREST,
     fuel_type: Annotated[FuelType | None, Query(alias="fuelType")] = None,
 ) -> GetStationsResponseBody:
-    if sort == StationSortType.CHEAPEST and fuel_type is None:
+    if sort in (StationSortType.CHEAPEST, StationSortType.LATEST) and fuel_type is None:
         raise HTTPException(
             status_code=422, detail="fuelType is required when sort=cheapest"
         )
@@ -209,17 +209,18 @@ async def get_stations(
                 .order_by(PriceRegistration.price.asc())
             )
         case StationSortType.LATEST:
-            lat_subq = sa.select(
-                sa.func.max(PriceRegistration.registered_at).label("latest_at")
-            ).where(
-                PriceRegistration.station_id == Station.id,
-                PriceRegistration.is_latest.is_(True),
-            )
-            if fuel_type is not None:
-                lat_subq = lat_subq.where(PriceRegistration.fuel_type == fuel_type)
-            lateral = lat_subq.lateral("latest_price")
-            query = base_query.outerjoin(lateral, sa.true()).order_by(
-                sa.nulls_last(lateral.c.latest_at.desc())
+            query = (
+                sa.select(Station)
+                .join(
+                    PriceRegistration,
+                    PriceRegistration.station_id == Station.id,
+                )
+                .where(
+                    sa.func.ST_DWithin(Station.location, user_point, distance),
+                    PriceRegistration.is_latest.is_(True),
+                    PriceRegistration.fuel_type == fuel_type,
+                )
+                .order_by(PriceRegistration.registered_at.desc())
             )
         case _:
             raise HTTPException(status_code=422, detail="Invalid sort type")
