@@ -209,10 +209,14 @@ async def get_stations(
                 .order_by(PriceRegistration.price.asc())
             )
         case StationSortType.LATEST:
-            latest_q = sa.select(
-                PriceRegistration.station_id,
-                sa.func.max(PriceRegistration.registered_at).label("latest_at"),
-            ).group_by(PriceRegistration.station_id)
+            latest_q = (
+                sa.select(
+                    PriceRegistration.station_id,
+                    sa.func.max(PriceRegistration.registered_at).label("latest_at"),
+                )
+                .where(PriceRegistration.is_latest.is_(True))
+                .group_by(PriceRegistration.station_id)
+            )
             if fuel_type is not None:
                 latest_q = latest_q.where(PriceRegistration.fuel_type == fuel_type)
             latest_subq = latest_q.subquery()
