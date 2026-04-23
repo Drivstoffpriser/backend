@@ -209,20 +209,18 @@ async def get_stations(
                 .order_by(PriceRegistration.price.asc())
             )
         case StationSortType.LATEST:
-            latest_q = (
-                sa.select(
-                    PriceRegistration.station_id,
-                    sa.func.max(PriceRegistration.registered_at).label("latest_at"),
-                )
-                .where(PriceRegistration.is_latest.is_(True))
-                .group_by(PriceRegistration.station_id)
+            lat_subq = sa.select(
+                sa.func.max(PriceRegistration.registered_at).label("latest_at")
+            ).where(
+                PriceRegistration.station_id == Station.id,
+                PriceRegistration.is_latest.is_(True),
             )
             if fuel_type is not None:
-                latest_q = latest_q.where(PriceRegistration.fuel_type == fuel_type)
-            latest_subq = latest_q.subquery()
-            query = base_query.outerjoin(
-                latest_subq, Station.id == latest_subq.c.station_id
-            ).order_by(sa.nulls_last(latest_subq.c.latest_at.desc()))
+                lat_subq = lat_subq.where(PriceRegistration.fuel_type == fuel_type)
+            lateral = lat_subq.lateral("latest_price")
+            query = base_query.outerjoin(lateral, sa.true()).order_by(
+                sa.nulls_last(lateral.c.latest_at.desc())
+            )
         case _:
             raise HTTPException(status_code=422, detail="Invalid sort type")
 
