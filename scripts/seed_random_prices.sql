@@ -14,14 +14,15 @@ SELECT
   fuel_type,
   round((18 + random() * 6) :: numeric, 2),
   NOW() - make_interval(secs => (random() * 3 * 86400)::int),
-  NULL,
+  u.id,
   false
 FROM
   station s
   CROSS JOIN unnest(
     ARRAY ['DIESEL', 'GASOLINE_95', 'GASOLINE_98'] :: text []
   ) AS fuel_type
-  CROSS JOIN generate_series(1, 2) AS entry;
+  CROSS JOIN generate_series(1, 2) AS entry
+  CROSS JOIN LATERAL (SELECT id FROM "user" ORDER BY md5(s.id::text || fuel_type || entry::text || random()::text) LIMIT 1) AS u;
 
 -- Mark the most recent registration per fuel type per station as is_latest
 UPDATE

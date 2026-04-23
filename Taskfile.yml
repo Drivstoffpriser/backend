@@ -17,15 +17,21 @@ tasks:
       - task: database:migrate
 
   database:seed:
-    desc: Seed the database with stations and price history
+    desc: Seed the database with stations, users, and price history
     cmds:
       - task: database:seed:stations
+      - task: database:seed:users
       - task: database:seed:prices
 
   database:seed:stations:
     desc: Seed the database with station data
     cmds:
       - uv run python scripts/seed.py
+
+  database:seed:users:
+    desc: Seed the database with sample users
+    cmds:
+      - PGPASSWORD=dummy_postgres_password psql -h localhost -p 5432 -U dummy_postgres_user -d drivstoffpriser -f scripts/seed_users.sql
 
   database:seed:prices:
     desc: Seed the database with sample price history data
