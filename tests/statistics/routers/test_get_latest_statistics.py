@@ -55,8 +55,10 @@ async def test_latest_returns_all_stations_extremes(
     extremes = response.json()["allStations"]
 
     assert extremes["DIESEL"]["lowestPrice"] == "17.00"
+    assert extremes["DIESEL"]["lowestStationId"] == str(cheap.id)
     assert extremes["DIESEL"]["lowestStationName"] == "Cheap Station"
     assert extremes["DIESEL"]["highestPrice"] == "25.00"
+    assert extremes["DIESEL"]["highestStationId"] == str(expensive.id)
     assert extremes["DIESEL"]["highestStationName"] == "Expensive Station"
 
     assert extremes["GASOLINE_95"]["lowestPrice"] == "18.00"
@@ -137,8 +139,10 @@ async def test_nearest_returns_extremes_among_multiple_nearby_stations(
     assert response.status_code == 200
     nearby = response.json()["nearbyStations"]
     assert nearby["DIESEL"]["lowestPrice"] == "17.00"
+    assert nearby["DIESEL"]["lowestStationId"] == str(cheap.id)
     assert nearby["DIESEL"]["lowestStationName"] == "Cheap Station"
     assert nearby["DIESEL"]["highestPrice"] == "25.00"
+    assert nearby["DIESEL"]["highestStationId"] == str(expensive.id)
     assert nearby["DIESEL"]["highestStationName"] == "Expensive Station"
 
 
