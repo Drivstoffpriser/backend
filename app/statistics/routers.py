@@ -1,6 +1,7 @@
 from datetime import date as date_type
 from decimal import Decimal
 from typing import Annotated
+from uuid import UUID
 
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, Query
@@ -22,8 +23,10 @@ statistics_router = APIRouter(
 
 class PriceStats(CamelCaseModel):
     highest_price: Decimal | None = None
+    highest_station_id: UUID | None = None
     highest_station_name: str | None = None
     lowest_price: Decimal | None = None
+    lowest_station_id: UUID | None = None
     lowest_station_name: str | None = None
 
 
@@ -57,6 +60,7 @@ async def _fetch_price_stats(
             sa.select(
                 PriceRegistration.fuel_type,
                 PriceRegistration.price,
+                Station.id.label("station_id"),
                 Station.name.label("station_name"),
             )
             .join(Station, Station.id == PriceRegistration.station_id)
@@ -75,16 +79,20 @@ async def _fetch_price_stats(
         sa.select(
             high.c.fuel_type,
             high.c.price.label("highest_price"),
+            high.c.station_id.label("highest_station_id"),
             high.c.station_name.label("highest_station_name"),
             low.c.price.label("lowest_price"),
+            low.c.station_id.label("lowest_station_id"),
             low.c.station_name.label("lowest_station_name"),
         ).join(low, high.c.fuel_type == low.c.fuel_type)
     )
     return {
         FuelType(row.fuel_type): PriceStats(
             highest_price=row.highest_price,
+            highest_station_id=row.highest_station_id,
             highest_station_name=row.highest_station_name,
             lowest_price=row.lowest_price,
+            lowest_station_id=row.lowest_station_id,
             lowest_station_name=row.lowest_station_name,
         )
         for row in result.all()
