@@ -322,6 +322,18 @@ async def test_sort_cheapest_excludes_stations_without_price(
     assert [s["externalId"] for s in stations] == ["node/priced"]
 
 
+async def test_sort_latest_requires_fuel_type(
+    client: AuthenticatedClient, unverified_user: User
+) -> None:
+    response = await client.get(
+        "/stations",
+        params={"lat": USER_LAT, "lng": USER_LNG, "distance": 10_000, "sort": "latest"},
+        authenticate_with=unverified_user,
+    )
+
+    assert response.status_code == 422
+
+
 async def test_sort_cheapest_requires_fuel_type(
     client: AuthenticatedClient, unverified_user: User
 ) -> None:
@@ -362,7 +374,13 @@ async def test_sort_latest_orders_by_most_recent_price_update(
 
     response = await client.get(
         "/stations",
-        params={"lat": USER_LAT, "lng": USER_LNG, "distance": 10_000, "sort": "latest"},
+        params={
+            "lat": USER_LAT,
+            "lng": USER_LNG,
+            "distance": 10_000,
+            "sort": "latest",
+            "fuelType": "DIESEL",
+        },
         authenticate_with=unverified_user,
     )
 
@@ -371,12 +389,10 @@ async def test_sort_latest_orders_by_most_recent_price_update(
     assert [s["externalId"] for s in stations] == ["node/new", "node/old"]
 
 
-async def test_sort_latest_puts_stations_without_prices_last(
+async def test_sort_latest_excludes_stations_without_prices_for_fuel_type(
     client: AuthenticatedClient, db: DBSession, unverified_user: User
 ) -> None:
-    s_no_prices = await station_factory(
-        db, external_id="node/no-prices", lat=59.911, lng=10.752
-    )
+    await station_factory(db, external_id="node/no-prices", lat=59.911, lng=10.752)
     s_priced = await station_factory(
         db, external_id="node/priced", lat=59.912, lng=10.752
     )
@@ -384,17 +400,22 @@ async def test_sort_latest_puts_stations_without_prices_last(
     await price_update_factory(
         db, station_id=s_priced.id, fuel_type=FuelType.DIESEL, price=Decimal("20.00")
     )
-    _ = s_no_prices  # registered but never given a price
 
     response = await client.get(
         "/stations",
-        params={"lat": USER_LAT, "lng": USER_LNG, "distance": 10_000, "sort": "latest"},
+        params={
+            "lat": USER_LAT,
+            "lng": USER_LNG,
+            "distance": 10_000,
+            "sort": "latest",
+            "fuelType": "DIESEL",
+        },
         authenticate_with=unverified_user,
     )
 
     assert response.status_code == 200
     stations = response.json()["stations"]
-    assert [s["externalId"] for s in stations] == ["node/priced", "node/no-prices"]
+    assert [s["externalId"] for s in stations] == ["node/priced"]
 
 
 async def test_sort_latest_with_fuel_type_ignores_other_fuel_types(
