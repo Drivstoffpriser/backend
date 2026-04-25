@@ -1,15 +1,7 @@
 import time
-from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
 from typing import Annotated
 
 import sqlalchemy as sa
-from apscheduler.schedulers.asyncio import (  # type: ignore[import-untyped]
-    AsyncIOScheduler,
-)
-from apscheduler.triggers.interval import (  # type: ignore[import-untyped]
-    IntervalTrigger,
-)
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -18,30 +10,13 @@ from app.core.db import DBSession, get_db_session
 from app.core.logging import logger
 from app.favorite_stations.routers import favorite_stations_router
 from app.stations.routers import stations_router
-from app.stations.sync import sync_prices_from_firestore
 from app.statistics.routers import statistics_router
 from app.tools.routers import tools_router
 from app.users.routers import users_router
 
-
-@asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
-    scheduler = AsyncIOScheduler()
-    scheduler.add_job(
-        sync_prices_from_firestore,
-        IntervalTrigger(minutes=10),
-        id="sync_prices",
-        replace_existing=True,
-    )
-    scheduler.start()
-    yield
-    scheduler.shutdown()
-
-
 app = FastAPI(
     title=get_settings().app_name,
     debug=get_settings().debug,
-    lifespan=lifespan,
 )
 
 app.add_middleware(
