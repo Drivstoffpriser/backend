@@ -45,6 +45,10 @@ strict = true
 plugins = ["pydantic.mypy"]
 exclude = ["alembic/versions"]
 
+[[tool.mypy.overrides]]
+module = ["firebase_admin", "firebase_admin.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]

@@ -17,6 +17,7 @@ from app.core.config import get_settings
 from app.core.db import DBSession, get_db_session
 from app.core.logging import logger
 from app.favorite_stations.routers import favorite_stations_router
+from app.notifications.routers import notifications_router
 from app.stations.routers import stations_router
 from app.stations.sync import sync_prices_from_firestore
 from app.statistics.routers import statistics_router
@@ -64,6 +65,7 @@ async def log_requests(request: Request, call_next):  # type: ignore[no-untyped-
 
 
 app.include_router(favorite_stations_router)
+app.include_router(notifications_router)
 app.include_router(stations_router)
 app.include_router(statistics_router)
 app.include_router(users_router)

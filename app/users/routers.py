@@ -3,7 +3,7 @@ import contextlib
 from typing import Annotated
 from uuid import UUID
 
-import firebase_admin.auth  # type: ignore[import-untyped]
+import firebase_admin.auth
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi_limiter.depends import RateLimiter

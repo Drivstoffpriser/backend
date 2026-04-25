@@ -2,7 +2,7 @@ from collections.abc import Generator
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
-import firebase_admin.auth  # type: ignore[import-untyped]
+import firebase_admin.auth
 import pytest
 import sqlalchemy as sa
 

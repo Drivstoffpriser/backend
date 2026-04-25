@@ -7,7 +7,7 @@ from typing import Annotated, Any, NamedTuple
 from uuid import UUID
 
 import sqlalchemy as sa
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from fastapi_limiter.depends import RateLimiter
 from geoalchemy2 import Geography, Geometry
 from geoalchemy2.shape import from_shape
@@ -18,6 +18,7 @@ from shapely.geometry import Point  # type: ignore[import-untyped]
 from app.core.auth import get_admin_user, get_current_user, get_logged_in_user
 from app.core.db import DBSession, get_db_session
 from app.core.schemas import CamelCaseModel, LocationSchema
+from app.notifications.services import send_price_drop_notifications_background
 from app.stations.enums import FuelType, ProviderType
 from app.stations.models import PriceRegistration, Station
 from app.users.models import User
@@ -466,6 +467,7 @@ async def register_prices(
     body: RegisterPricesRequestBody,
     db: Annotated[DBSession, Depends(get_db_session)],
     logged_in_user: Annotated[User, Depends(get_logged_in_user)],
+    background_tasks: BackgroundTasks,
 ) -> None:
     fuel_types = [r.fuel_type for r in body.registrations]
     await db.execute(
@@ -490,6 +492,14 @@ async def register_prices(
             )
         )
     await db.commit()
+
+    for registration in body.registrations:
+        background_tasks.add_task(
+            send_price_drop_notifications_background,
+            station_id=station_id,
+            fuel_type=registration.fuel_type,
+            new_price=registration.price,
+        )
 
 
 class UpdateStationRequestBody(CamelCaseModel):
