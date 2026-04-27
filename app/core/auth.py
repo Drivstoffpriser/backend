@@ -4,9 +4,9 @@ import json
 from functools import lru_cache
 from typing import Annotated, Any, cast
 
-import firebase_admin  # type: ignore[import-untyped]
-import firebase_admin.auth  # type: ignore[import-untyped]
-import firebase_admin.credentials  # type: ignore[import-untyped]
+import firebase_admin
+import firebase_admin.auth
+import firebase_admin.credentials
 import sqlalchemy as sa
 import sqlalchemy.orm
 from fastapi import Depends, HTTPException, status

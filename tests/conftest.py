@@ -1,6 +1,7 @@
 import asyncio
 from collections.abc import AsyncGenerator, Generator
 from typing import Any
+from unittest.mock import AsyncMock, patch
 
 import pytest
 import sqlalchemy as sa
@@ -9,6 +10,7 @@ from httpx import ASGITransport, AsyncClient, Response
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.pool import NullPool
 
+import app.stations.routers as stations_routers
 from app.core.auth import get_current_user
 from app.core.config import get_settings
 from app.core.db import (
@@ -106,7 +108,19 @@ async def db() -> AsyncGenerator[DBSession]:
 
 
 @pytest.fixture
-async def client(db: DBSession) -> AsyncGenerator[AuthenticatedClient]:
+def mock_send_price_drop_notifications() -> Generator[AsyncMock]:
+    with patch.object(
+        stations_routers,
+        "send_price_drop_notifications_background",
+        new_callable=AsyncMock,
+    ) as mock:
+        yield mock
+
+
+@pytest.fixture
+async def client(
+    db: DBSession, mock_send_price_drop_notifications: AsyncMock
+) -> AsyncGenerator[AuthenticatedClient]:
     async def override_db() -> AsyncGenerator[DBSession]:
         yield db
 
@@ -122,7 +136,6 @@ async def client(db: DBSession) -> AsyncGenerator[AuthenticatedClient]:
         if hasattr(route, "dependant"):
             walk_dependant(route.dependant)
 
-    # Create client
     async with AuthenticatedClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as c:

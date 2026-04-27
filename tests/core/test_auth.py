@@ -2,7 +2,7 @@ from collections.abc import Generator
 from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
-import firebase_admin.auth  # type: ignore[import-untyped]
+import firebase_admin.auth
 import pytest
 from fastapi import HTTPException
 from fastapi.security import HTTPAuthorizationCredentials

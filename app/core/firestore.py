@@ -1,6 +1,6 @@
 """Firestore client helpers."""
 
-import firebase_admin.firestore  # type: ignore[import-untyped]
+import firebase_admin.firestore
 
 from app.core.auth import get_firebase_app
 

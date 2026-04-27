@@ -1,4 +1,5 @@
 from decimal import Decimal
+from unittest.mock import AsyncMock, call
 
 import sqlalchemy as sa
 
@@ -194,3 +195,56 @@ async def test_register_prices_sets_registered_by_to_authenticated_user(
         )
     )
     assert row.registered_by == unverified_user.id
+
+
+async def test_register_prices_fires_notifications_for_each_fuel_type(
+    client: AuthenticatedClient,
+    db: DBSession,
+    unverified_user: User,
+    mock_send_price_drop_notifications: AsyncMock,
+) -> None:
+    station = await station_factory(db, external_id="node/1")
+
+    await client.post(
+        f"/stations/{station.id}/prices",
+        json={
+            "registrations": [
+                {"fuelType": FuelType.DIESEL, "price": "20.00"},
+                {"fuelType": FuelType.GASOLINE_95, "price": "22.90"},
+            ]
+        },
+        authenticate_with=unverified_user,
+    )
+
+    mock_send_price_drop_notifications.assert_has_calls(
+        [
+            call(
+                station_id=station.id,
+                fuel_type=FuelType.DIESEL,
+                new_price=Decimal("20.00"),
+            ),
+            call(
+                station_id=station.id,
+                fuel_type=FuelType.GASOLINE_95,
+                new_price=Decimal("22.90"),
+            ),
+        ],
+        any_order=True,
+    )
+
+
+async def test_register_prices_does_not_fire_notifications_on_validation_error(
+    client: AuthenticatedClient,
+    db: DBSession,
+    unverified_user: User,
+    mock_send_price_drop_notifications: AsyncMock,
+) -> None:
+    station = await station_factory(db, external_id="node/1")
+
+    await client.post(
+        f"/stations/{station.id}/prices",
+        json={"registrations": [{"fuelType": FuelType.DIESEL, "price": "9.99"}]},
+        authenticate_with=unverified_user,
+    )
+
+    mock_send_price_drop_notifications.assert_not_called()
